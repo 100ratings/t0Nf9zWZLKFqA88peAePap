@@ -1,51 +1,52 @@
 const { Pool } = require('pg');
 
-// URI do Pooler do Supabase
-const connectionString = 'postgresql://postgres.beffanooezicdxxldejx:fk8Fresqor2&@aws-1-sa-east-1.pooler.supabase.com:6543/postgres?sslmode=require';
-
-const pool = new Pool({
-  connectionString: connectionString,
+/**
+ * CONFIGURAÇÃO DE CONEXÃO - SUPABASE
+ * Usando codificação para caracteres especiais na senha (como o &)
+ */
+const dbConfig = {
+  user: 'postgres.beffanooezicdxxldejx',
+  host: 'aws-1-sa-east-1.pooler.supabase.com',
+  database: 'postgres',
+  password: 'fk8Fresqor2&',
+  port: 5432,
   ssl: {
     rejectUnauthorized: false
   },
   max: 10,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 10000,
-});
+};
 
-// Tratamento de erros no pool para evitar queda do servidor
+const pool = new Pool(dbConfig);
+
+// Tratamento de erros no pool
 pool.on('error', (err) => {
   console.error('❌ Erro inesperado no pool do PostgreSQL:', err.message);
 });
 
 /**
- * Executa uma query de forma segura com tratamento de erros
+ * Executa uma query de forma segura
  */
 const query = async (text, params) => {
-  const start = Date.now();
   try {
-    const res = await pool.query(text, params);
-    const duration = Date.now() - start;
-    // console.log('Executada query:', { text, duration, rows: res.rowCount });
-    return res;
+    return await pool.query(text, params);
   } catch (err) {
-    console.error('❌ Erro na execução da query:', { text, error: err.message });
+    console.error('❌ Erro na execução da query:', err.message);
     throw err;
   }
 };
 
 /**
- * Inicializa as tabelas no PostgreSQL
+ * Inicializa as tabelas
  */
 const initDb = async () => {
-  console.log('🔄 Iniciando conexão com o banco de dados...');
-  
+  console.log('🔄 Iniciando conexão direta com o banco de dados (Porta 5432)...');
   try {
-    // Testar conexão
     await pool.query('SELECT NOW()');
     console.log('✅ Conexão estabelecida com sucesso com o Supabase');
-
-    // Tabela de Licenças
+    
+    // Garantir que as tabelas existam
     await query(`
       CREATE TABLE IF NOT EXISTS licenses (
         id SERIAL PRIMARY KEY,
@@ -61,7 +62,6 @@ const initDb = async () => {
       )
     `);
 
-    // Tabela de Histórico
     await query(`
       CREATE TABLE IF NOT EXISTS activation_history (
         id SERIAL PRIMARY KEY,
@@ -74,14 +74,10 @@ const initDb = async () => {
       )
     `);
 
-    // Índices
-    await query(`CREATE INDEX IF NOT EXISTS idx_license_key ON licenses(license_key)`);
-    await query(`CREATE INDEX IF NOT EXISTS idx_status ON licenses(status)`);
-
-    console.log('✅ Estrutura do banco de dados verificada e pronta.');
+    console.log('✅ Estrutura do banco de dados pronta.');
     return true;
   } catch (err) {
-    console.error('❌ Falha crítica na inicialização do banco:', err.message);
+    console.error('❌ Falha na inicialização do banco:', err.message);
     return false;
   }
 };
