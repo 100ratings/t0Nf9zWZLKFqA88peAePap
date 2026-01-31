@@ -44,7 +44,7 @@ class LicenseManager {
   }
 
   // Ativar licença
-  async activate(licenseKey) {
+  async activate(licenseKey, force = false) {
     try {
       const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.ACTIVATE}`, {
         method: 'POST',
@@ -54,7 +54,8 @@ class LicenseManager {
         body: JSON.stringify({
           license_key: licenseKey.trim().toUpperCase(),
           device_id: this.deviceId,
-          device_info: getDeviceInfo()
+          device_info: getDeviceInfo(),
+          force: force
         })
       });
 
@@ -71,7 +72,11 @@ class LicenseManager {
         
         return { success: true, message: data.message };
       } else {
-        return { success: false, message: data.message };
+        return { 
+          success: false, 
+          message: data.message, 
+          needsConfirmation: data.needsConfirmation 
+        };
       }
     } catch (error) {
       console.error('Erro ao ativar licença:', error);

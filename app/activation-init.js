@@ -1,10 +1,20 @@
 // Inicialização do Sistema de Ativação
 (async function() {
   const activationScreen = document.getElementById('activationScreen');
+  const installScreen = document.getElementById('installScreen');
+  const activationForm = document.getElementById('activationForm');
+  const confirmSwap = document.getElementById('confirmSwap');
+  
   const licenseInput = document.getElementById('licenseInput');
   const activateButton = document.getElementById('activateButton');
+  const confirmSwapBtn = document.getElementById('confirmSwapBtn');
+  const cancelSwapBtn = document.getElementById('cancelSwapBtn');
+  
   const activationMessage = document.getElementById('activationMessage');
   const deviceIdDisplay = document.getElementById('deviceIdDisplay');
+
+  // Verificar se está rodando como Standalone (Tela de Início)
+  const isStandalone = window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches;
 
   // Exibir Device ID
   deviceIdDisplay.textContent = licenseManager.deviceId;
@@ -20,7 +30,7 @@
   }
 
   // Função para ativar licença
-  async function activateLicense() {
+  async function activateLicense(force = false) {
     const licenseKey = licenseInput.value.trim();
 
     if (!licenseKey) {
@@ -28,38 +38,56 @@
       return;
     }
 
-    // Desabilitar botão e mostrar loading
+    // Desabilitar botões e mostrar loading
     activateButton.disabled = true;
-    activateButton.innerHTML = '<span class="spinner"></span> Ativando...';
+    confirmSwapBtn.disabled = true;
+    const originalBtnText = activateButton.innerHTML;
+    activateButton.innerHTML = '<span class="spinner"></span> Processando...';
 
     // Tentar ativar
-    const result = await licenseManager.activate(licenseKey);
+    const result = await licenseManager.activate(licenseKey, force);
 
     if (result.success) {
-      showMessage(result.message, 'success');
+      showMessage('Ativado com sucesso!', 'success');
       
       // Aguardar 1 segundo e esconder tela de ativação
       setTimeout(() => {
         activationScreen.classList.add('hidden');
-        
-        // Remover da DOM após animação
         setTimeout(() => {
           activationScreen.style.display = 'none';
         }, 500);
       }, 1000);
     } else {
-      showMessage(result.message, 'error');
+      if (result.needsConfirmation) {
+        // Mostrar tela de confirmação de troca
+        activationForm.classList.add('hidden');
+        confirmSwap.classList.remove('hidden');
+      } else {
+        showMessage(result.message || 'Erro ao ativar', 'error');
+      }
+      
       activateButton.disabled = false;
+      confirmSwapBtn.disabled = false;
       activateButton.innerHTML = 'Ativar Licença';
     }
   }
 
   // Event listeners
-  activateButton.addEventListener('click', activateLicense);
+  activateButton.addEventListener('click', () => activateLicense(false));
+  confirmSwapBtn.addEventListener('click', () => activateLicense(true));
+  
+  cancelSwapBtn.addEventListener('click', () => {
+    confirmSwap.classList.add('hidden');
+    activationForm.classList.remove('hidden');
+    activateButton.disabled = false;
+    activateButton.innerHTML = 'Ativar Licença';
+  });
   
   licenseInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') {
-      activateLicense();
+      if (confirmSwap.classList.contains('hidden')) {
+        activateLicense(false);
+      }
     }
   });
 
@@ -72,12 +100,16 @@
   const isActivated = await licenseManager.checkActivation();
   
   if (isActivated) {
-    console.log('✅ Licença já ativada para:', licenseManager.getCustomerName());
-    // Mantém escondido (display: none já vem do CSS)
+    console.log('✅ Licença já ativada');
+    // Se já estiver ativado, não precisamos mostrar nada, nem a tela de instalação
   } else {
-    console.log('⚠️ Aplicativo não ativado. Aguardando licença...');
-    // Só mostra se NÃO estiver ativado
-    activationScreen.style.display = 'flex';
+    // Se não estiver ativado, verificar se está no modo Standalone
+    if (!isStandalone) {
+      installScreen.classList.remove('hidden');
+      activationScreen.style.display = 'none';
+    } else {
+      activationScreen.style.display = 'flex';
+    }
   }
 
   // Validação periódica (a cada 5 minutos)
@@ -86,12 +118,13 @@
       const isValid = await licenseManager.checkActivation();
       
       if (!isValid) {
-        console.log('❌ Licença inválida. Mostrando tela de ativação...');
         activationScreen.style.display = 'flex';
         activationScreen.classList.remove('hidden');
-        showMessage('Sua licença foi desativada. Por favor, ative novamente.', 'error');
+        activationForm.classList.remove('hidden');
+        confirmSwap.classList.add('hidden');
+        showMessage('Sua licença foi desativada ou está em uso em outro aparelho.', 'error');
       }
     }
-  }, 5 * 60 * 1000); // 5 minutos
+  }, 5 * 60 * 1000);
 
 })();

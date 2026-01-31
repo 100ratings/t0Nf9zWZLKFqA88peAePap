@@ -392,3 +392,62 @@ html, body {
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
+
+/* Estilos para Instalação Obrigatória */
+.install-instructions {
+  text-align: left;
+  margin: 20px 0;
+  background: #f2f2f7;
+  padding: 20px;
+  border-radius: 20px;
+}
+
+.install-instructions .step {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 15px;
+  font-size: 14px;
+  color: #1c1c1e;
+}
+
+.install-instructions .step:last-child {
+  margin-bottom: 0;
+}
+
+.step-num {
+  background: var(--accent);
+  color: #fff;
+  width: 24px;
+  height: 24px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+#installScreen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+#installScreen.hidden {
+  display: none;
+}
+
+#activationForm.hidden, #confirmSwap.hidden {
+  display: none;
+}
