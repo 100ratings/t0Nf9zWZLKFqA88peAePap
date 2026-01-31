@@ -1,13 +1,18 @@
 const { Pool } = require('pg');
 
 /**
- * CONFIGURAÇÃO V8 - SUPABASE VIA POOLER (PORTA 6543)
+ * CONFIGURAÇÃO DE BANCO DE DATAS - SUPABASE
  * Correção para erro de certificado SSL no Render
  */
+
+// Forçar a desativação da verificação de TLS para certificados autoassinados
+// Isso resolve o erro "self-signed certificate in certificate chain"
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+
 const dbConfig = {
-  connectionString: 'postgresql://postgres.beffanooezicdxxldejx:fk8Fresqor2&@aws-1-sa-east-1.pooler.supabase.com:6543/postgres?sslmode=require',
+  // Nota: A URL abaixo deve ser a sua URL de conexão do Supabase (Transaction Pooler)
+  connectionString: 'postgresql://postgres.beffanooezicdxxldejx:fk8Fresqor2&@aws-0-sa-east-1.pooler.supabase.com:6543/postgres',
   ssl: {
-    // Esta é a chave para resolver o erro "self-signed certificate"
     rejectUnauthorized: false 
   },
   max: 5,
@@ -31,11 +36,11 @@ const query = async (text, params) => {
 };
 
 const initDb = async () => {
-  console.log('🔄 Iniciando conexão via Transaction Pooler (V8)...');
+  console.log('🔄 Iniciando conexão com o banco de dados...');
   try {
     // Teste de conexão
     await pool.query('SELECT NOW()');
-    console.log('✅ Conexão estabelecida com sucesso com o Supabase!');
+    console.log('✅ Conexão estabelecida com sucesso!');
     
     await query(`
       CREATE TABLE IF NOT EXISTS licenses (
@@ -68,6 +73,7 @@ const initDb = async () => {
     return true;
   } catch (err) {
     console.error('❌ Falha na inicialização do banco:', err.message);
+    console.log('💡 Dica: Verifique se a URL de conexão no arquivo database.js está correta e se o banco está ativo.');
     return false;
   }
 };
