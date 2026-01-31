@@ -14,12 +14,20 @@ app.use(cors());
 app.use(express.json());
 
 /**
- * Utilitário para gerar chaves de licença
+ * Utilitário para gerar chaves de licença seguras
+ * Formato: AX-XXXX-XXXX-XXXX (Onde X é alfanumérico aleatório)
  */
-function generateLicenseKey(customerName) {
-  const name = customerName.toUpperCase().replace(/[^A-Z0-9]/g, '').substring(0, 10);
-  const randomNum = Math.floor(Math.random() * 900) + 100;
-  return `${name}-${randomNum}`;
+function generateLicenseKey() {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  const segment = () => {
+    let str = '';
+    for (let i = 0; i < 4; i++) {
+      str += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return str;
+  };
+  
+  return `SD-${segment()}-${segment()}-${segment()}`;
 }
 
 /**
@@ -60,7 +68,7 @@ app.post('/api/admin/licenses', authenticateAdmin, async (req, res) => {
       return res.status(400).json({ success: false, message: 'Nome do cliente é obrigatório' });
     }
 
-    const license_key = generateLicenseKey(customer_name);
+    const license_key = generateLicenseKey();
     
     await db.query(
       'INSERT INTO licenses (license_key, customer_name, notes, status) VALUES ($1, $2, $3, $4)',
