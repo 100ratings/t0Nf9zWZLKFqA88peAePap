@@ -59,10 +59,16 @@ async function handleLogin() {
   loginButton.textContent = 'Entrando...';
   
   try {
+    // Timeout de 30 segundos para lidar com o "wake up" do Render
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+
     const data = await apiRequest(ADMIN_API_CONFIG.ENDPOINTS.LOGIN, {
       method: 'POST',
-      body: JSON.stringify({ password })
+      body: JSON.stringify({ password }),
+      signal: controller.signal
     });
+    clearTimeout(timeoutId);
     
     if (data && data.success) {
       adminToken = data.token;
@@ -75,7 +81,11 @@ async function handleLogin() {
       loginButton.textContent = 'Entrar';
     }
   } catch (error) {
-    showMessage(loginMessage, 'Erro de conexão. Verifique se o servidor está rodando.', 'error');
+    if (error.name === 'AbortError') {
+      showMessage(loginMessage, 'O servidor está demorando a responder (acordando). Tente novamente em instantes.', 'error');
+    } else {
+      showMessage(loginMessage, 'Erro de conexão. Verifique se o servidor está rodando.', 'error');
+    }
     loginButton.disabled = false;
     loginButton.textContent = 'Entrar';
   }

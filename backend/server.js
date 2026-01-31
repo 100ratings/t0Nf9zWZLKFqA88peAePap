@@ -8,7 +8,8 @@ const db = require('./database');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_SECRET = process.env.JWT_SECRET || 'sethi-draw-secret-key-2026';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
 
 // Middleware
 app.use(cors());
@@ -22,17 +23,21 @@ function generateLicenseKey(customerName) {
 }
 
 // Função para registrar histórico
-function logActivation(licenseKey, deviceId, deviceInfo, action) {
-  db.run(
-    `INSERT INTO activation_history (license_key, device_id, device_info, action) VALUES (?, ?, ?, ?)`,
-    [licenseKey, deviceId, deviceInfo, action]
-  );
+async function logActivation(licenseKey, deviceId, deviceInfo, action) {
+  try {
+    await db.query(
+      `INSERT INTO activation_history (license_key, device_id, device_info, action) VALUES ($1, $2, $3, $4)`,
+      [licenseKey, deviceId, deviceInfo, action]
+    );
+  } catch (err) {
+    console.error('Erro ao registrar histórico:', err);
+  }
 }
 
 // ==================== ROTAS DE LICENÇA ====================
 
 // Ativar licença
-app.post('/api/license/activate', (req, res) => {
+app.post('/api/license/activate', async (req, res) => {
   try {
     const { license_key, device_id, device_info } = req.body;
 
@@ -44,58 +49,48 @@ app.post('/api/license/activate', (req, res) => {
     }
 
     // Verificar se a licença existe
-    db.get('SELECT * FROM licenses WHERE license_key = ?', [license_key], (err, license) => {
-      if (err) {
-        console.error('Erro ao buscar licença:', err);
-        return res.status(500).json({ success: false, message: 'Erro interno do servidor' });
-      }
+    const licenseRes = await db.query('SELECT * FROM licenses WHERE license_key = $1', [license_key]);
+    const license = licenseRes.rows[0];
 
-      if (!license) {
-        return res.status(404).json({ 
-          success: false, 
-          message: 'Licença não encontrada. Verifique a chave digitada.' 
-        });
-      }
+    if (!license) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Licença não encontrada. Verifique a chave digitada.' 
+      });
+    }
 
-      // Se a licença já está ativa em outro dispositivo, desativar
-      if (license.status === 'active' && license.device_id !== device_id) {
-        logActivation(license_key, license.device_id, license.device_info, 'DEACTIVATED');
-        console.log(`🔄 Licença ${license_key} desativada do dispositivo anterior: ${license.device_id}`);
-      }
+    // Se a licença já está ativa em outro dispositivo, desativar
+    if (license.status === 'active' && license.device_id !== device_id) {
+      await logActivation(license_key, license.device_id, license.device_info, 'DEACTIVATED');
+      console.log(`🔄 Licença ${license_key} desativada do dispositivo anterior: ${license.device_id}`);
+    }
 
-      // Ativar licença no novo dispositivo
-      db.run(
-        `UPDATE licenses 
-         SET device_id = ?, device_info = ?, status = 'active', 
-             activated_at = CURRENT_TIMESTAMP, last_validation = CURRENT_TIMESTAMP
-         WHERE license_key = ?`,
-        [device_id, device_info || '', license_key],
-        (err) => {
-          if (err) {
-            console.error('Erro ao ativar licença:', err);
-            return res.status(500).json({ success: false, message: 'Erro ao ativar licença' });
-          }
+    // Ativar licença no novo dispositivo
+    await db.query(
+      `UPDATE licenses 
+       SET device_id = $1, device_info = $2, status = 'active', 
+           activated_at = CURRENT_TIMESTAMP, last_validation = CURRENT_TIMESTAMP
+       WHERE license_key = $3`,
+      [device_id, device_info || '', license_key]
+    );
 
-          // Registrar ativação no histórico
-          logActivation(license_key, device_id, device_info || '', 'ACTIVATED');
+    // Registrar ativação no histórico
+    await logActivation(license_key, device_id, device_info || '', 'ACTIVATED');
 
-          // Gerar token JWT
-          const token = jwt.sign(
-            { license_key, device_id, customer_name: license.customer_name },
-            JWT_SECRET,
-            { expiresIn: '30d' }
-          );
+    // Gerar token JWT
+    const token = jwt.sign(
+      { license_key, device_id, customer_name: license.customer_name },
+      JWT_SECRET,
+      { expiresIn: '30d' }
+    );
 
-          console.log(`✅ Licença ${license_key} ativada no dispositivo: ${device_id}`);
+    console.log(`✅ Licença ${license_key} ativada no dispositivo: ${device_id}`);
 
-          res.json({
-            success: true,
-            message: 'Licença ativada com sucesso!',
-            token,
-            customer_name: license.customer_name
-          });
-        }
-      );
+    res.json({
+      success: true,
+      message: 'Licença ativada com sucesso!',
+      token,
+      customer_name: license.customer_name
     });
 
   } catch (error) {
@@ -105,7 +100,7 @@ app.post('/api/license/activate', (req, res) => {
 });
 
 // Validar licença
-app.post('/api/license/validate', (req, res) => {
+app.post('/api/license/validate', async (req, res) => {
   try {
     const { token, device_id } = req.body;
 
@@ -128,35 +123,30 @@ app.post('/api/license/validate', (req, res) => {
     }
 
     // Verificar se a licença ainda está ativa no dispositivo correto
-    db.get(
-      `SELECT * FROM licenses WHERE license_key = ? AND device_id = ? AND status = 'active'`,
-      [decoded.license_key, device_id],
-      (err, license) => {
-        if (err) {
-          console.error('Erro ao validar licença:', err);
-          return res.status(500).json({ success: false, message: 'Erro interno do servidor' });
-        }
-
-        if (!license) {
-          return res.status(403).json({ 
-            success: false, 
-            message: 'Licença não está ativa neste dispositivo' 
-          });
-        }
-
-        // Atualizar última validação
-        db.run(
-          `UPDATE licenses SET last_validation = CURRENT_TIMESTAMP WHERE license_key = ?`,
-          [decoded.license_key]
-        );
-
-        res.json({
-          success: true,
-          message: 'Licença válida',
-          customer_name: license.customer_name
-        });
-      }
+    const licenseRes = await db.query(
+      `SELECT * FROM licenses WHERE license_key = $1 AND device_id = $2 AND status = 'active'`,
+      [decoded.license_key, device_id]
     );
+    const license = licenseRes.rows[0];
+
+    if (!license) {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Licença não está ativa neste dispositivo' 
+      });
+    }
+
+    // Atualizar última validação
+    await db.query(
+      `UPDATE licenses SET last_validation = CURRENT_TIMESTAMP WHERE license_key = $1`,
+      [decoded.license_key]
+    );
+
+    res.json({
+      success: true,
+      message: 'Licença válida',
+      customer_name: license.customer_name
+    });
 
   } catch (error) {
     console.error('Erro ao validar licença:', error);
@@ -165,31 +155,27 @@ app.post('/api/license/validate', (req, res) => {
 });
 
 // Obter status da licença
-app.get('/api/license/status/:license_key', (req, res) => {
+app.get('/api/license/status/:license_key', async (req, res) => {
   try {
     const { license_key } = req.params;
 
-    db.get('SELECT * FROM licenses WHERE license_key = ?', [license_key], (err, license) => {
-      if (err) {
-        console.error('Erro ao obter status:', err);
-        return res.status(500).json({ success: false, message: 'Erro interno do servidor' });
-      }
+    const licenseRes = await db.query('SELECT * FROM licenses WHERE license_key = $1', [license_key]);
+    const license = licenseRes.rows[0];
 
-      if (!license) {
-        return res.status(404).json({ success: false, message: 'Licença não encontrada' });
-      }
+    if (!license) {
+      return res.status(404).json({ success: false, message: 'Licença não encontrada' });
+    }
 
-      res.json({
-        success: true,
-        license: {
-          license_key: license.license_key,
-          customer_name: license.customer_name,
-          status: license.status,
-          device_id: license.device_id,
-          activated_at: license.activated_at,
-          last_validation: license.last_validation
-        }
-      });
+    res.json({
+      success: true,
+      license: {
+        license_key: license.license_key,
+        customer_name: license.customer_name,
+        status: license.status,
+        device_id: license.device_id,
+        activated_at: license.activated_at,
+        last_validation: license.last_validation
+      }
     });
 
   } catch (error) {
@@ -226,19 +212,24 @@ app.post('/api/admin/login', (req, res) => {
   try {
     const { password } = req.body;
 
-    if (password === process.env.ADMIN_PASSWORD) {
+    if (!password) {
+      return res.status(400).json({ success: false, message: 'Senha é obrigatória' });
+    }
+
+    if (password === ADMIN_PASSWORD) {
       const token = jwt.sign({ role: 'admin' }, JWT_SECRET, { expiresIn: '24h' });
       res.json({ success: true, token });
     } else {
       res.status(401).json({ success: false, message: 'Senha incorreta' });
     }
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Erro interno' });
+    console.error('Erro no login admin:', error);
+    res.status(500).json({ success: false, message: 'Erro interno no servidor' });
   }
 });
 
 // Criar nova licença
-app.post('/api/admin/licenses', authenticateAdmin, (req, res) => {
+app.post('/api/admin/licenses', authenticateAdmin, async (req, res) => {
   try {
     const { customer_name, notes } = req.body;
 
@@ -251,29 +242,23 @@ app.post('/api/admin/licenses', authenticateAdmin, (req, res) => {
 
     const license_key = generateLicenseKey(customer_name);
 
-    db.run(
-      `INSERT INTO licenses (license_key, customer_name, notes) VALUES (?, ?, ?)`,
-      [license_key, customer_name, notes || ''],
-      (err) => {
-        if (err) {
-          console.error('Erro ao criar licença:', err);
-          return res.status(500).json({ success: false, message: 'Erro ao criar licença' });
-        }
-
-        console.log(`🆕 Nova licença criada: ${license_key} para ${customer_name}`);
-
-        res.json({
-          success: true,
-          message: 'Licença criada com sucesso',
-          license: {
-            license_key,
-            customer_name,
-            status: 'inactive',
-            created_at: new Date().toISOString()
-          }
-        });
-      }
+    await db.query(
+      `INSERT INTO licenses (license_key, customer_name, notes) VALUES ($1, $2, $3)`,
+      [license_key, customer_name, notes || '']
     );
+
+    console.log(`🆕 Nova licença criada: ${license_key} para ${customer_name}`);
+
+    res.json({
+      success: true,
+      message: 'Licença criada com sucesso',
+      license: {
+        license_key,
+        customer_name,
+        status: 'inactive',
+        created_at: new Date().toISOString()
+      }
+    });
 
   } catch (error) {
     console.error('Erro ao criar licença:', error);
@@ -282,15 +267,10 @@ app.post('/api/admin/licenses', authenticateAdmin, (req, res) => {
 });
 
 // Listar todas as licenças
-app.get('/api/admin/licenses', authenticateAdmin, (req, res) => {
+app.get('/api/admin/licenses', authenticateAdmin, async (req, res) => {
   try {
-    db.all('SELECT * FROM licenses ORDER BY created_at DESC', [], (err, licenses) => {
-      if (err) {
-        console.error('Erro ao listar licenças:', err);
-        return res.status(500).json({ success: false, message: 'Erro ao listar licenças' });
-      }
-      res.json({ success: true, licenses });
-    });
+    const licensesRes = await db.query('SELECT * FROM licenses ORDER BY created_at DESC');
+    res.json({ success: true, licenses: licensesRes.rows });
   } catch (error) {
     console.error('Erro ao listar licenças:', error);
     res.status(500).json({ success: false, message: 'Erro ao listar licenças' });
@@ -298,64 +278,43 @@ app.get('/api/admin/licenses', authenticateAdmin, (req, res) => {
 });
 
 // Revogar licença
-app.post('/api/admin/licenses/:license_key/revoke', authenticateAdmin, (req, res) => {
+app.post('/api/admin/licenses/:license_key/revoke', authenticateAdmin, async (req, res) => {
   try {
     const { license_key } = req.params;
 
-    db.get('SELECT * FROM licenses WHERE license_key = ?', [license_key], (err, license) => {
-      if (err) {
-        console.error('Erro ao buscar licença:', err);
-        return res.status(500).json({ success: false, message: 'Erro interno' });
-      }
+    const licenseRes = await db.query('SELECT * FROM licenses WHERE license_key = $1', [license_key]);
+    const license = licenseRes.rows[0];
 
-      if (!license) {
-        return res.status(404).json({ success: false, message: 'Licença não encontrada' });
-      }
+    if (!license) {
+      return res.status(404).json({ success: false, message: 'Licença não encontrada' });
+    }
 
-      db.run(
-        `UPDATE licenses SET status = 'revoked', device_id = NULL WHERE license_key = ?`,
-        [license_key],
-        (err) => {
-          if (err) {
-            console.error('Erro ao revogar licença:', err);
-            return res.status(500).json({ success: false, message: 'Erro ao revogar licença' });
-          }
+    await db.query(
+      `UPDATE licenses SET status = 'revoked', device_id = NULL WHERE license_key = $1`,
+      [license_key]
+    );
 
-          logActivation(license_key, license.device_id || 'N/A', '', 'REVOKED');
-          console.log(`🚫 Licença ${license_key} revogada`);
+    await logActivation(license_key, license.device_id || 'N/A', '', 'REVOKED');
+    console.log(`🚫 Licença ${license_key} revogada`);
 
-          res.json({ success: true, message: 'Licença revogada com sucesso' });
-        }
-      );
-    });
+    res.json({ success: true, message: 'Licença revogada com sucesso' });
 
   } catch (error) {
     console.error('Erro ao revogar licença:', error);
-    res.status(500).json({ success: false, message: 'Erro ao revogar licença' });
+    res.status(500).json({ success: false, message: 'Erro interno' });
   }
 });
 
 // Deletar licença
-app.delete('/api/admin/licenses/:license_key', authenticateAdmin, (req, res) => {
+app.delete('/api/admin/licenses/:license_key', authenticateAdmin, async (req, res) => {
   try {
     const { license_key } = req.params;
 
-    db.run('DELETE FROM activation_history WHERE license_key = ?', [license_key], (err) => {
-      if (err) {
-        console.error('Erro ao deletar histórico:', err);
-        return res.status(500).json({ success: false, message: 'Erro ao deletar licença' });
-      }
+    await db.query('DELETE FROM activation_history WHERE license_key = $1', [license_key]);
+    await db.query('DELETE FROM licenses WHERE license_key = $1', [license_key]);
 
-      db.run('DELETE FROM licenses WHERE license_key = ?', [license_key], (err) => {
-        if (err) {
-          console.error('Erro ao deletar licença:', err);
-          return res.status(500).json({ success: false, message: 'Erro ao deletar licença' });
-        }
-
-        console.log(`🗑️ Licença ${license_key} deletada`);
-        res.json({ success: true, message: 'Licença deletada com sucesso' });
-      });
-    });
+    console.log(`🗑️ Licença ${license_key} deletada`);
+    res.json({ success: true, message: 'Licença deletada com sucesso' });
 
   } catch (error) {
     console.error('Erro ao deletar licença:', error);
@@ -364,21 +323,15 @@ app.delete('/api/admin/licenses/:license_key', authenticateAdmin, (req, res) => 
 });
 
 // Obter histórico de ativações
-app.get('/api/admin/licenses/:license_key/history', authenticateAdmin, (req, res) => {
+app.get('/api/admin/licenses/:license_key/history', authenticateAdmin, async (req, res) => {
   try {
     const { license_key } = req.params;
 
-    db.all(
-      `SELECT * FROM activation_history WHERE license_key = ? ORDER BY timestamp DESC`,
-      [license_key],
-      (err, history) => {
-        if (err) {
-          console.error('Erro ao obter histórico:', err);
-          return res.status(500).json({ success: false, message: 'Erro ao obter histórico' });
-        }
-        res.json({ success: true, history });
-      }
+    const historyRes = await db.query(
+      `SELECT * FROM activation_history WHERE license_key = $1 ORDER BY timestamp DESC`,
+      [license_key]
     );
+    res.json({ success: true, history: historyRes.rows });
 
   } catch (error) {
     console.error('Erro ao obter histórico:', error);
@@ -387,29 +340,21 @@ app.get('/api/admin/licenses/:license_key/history', authenticateAdmin, (req, res
 });
 
 // Estatísticas
-app.get('/api/admin/stats', authenticateAdmin, (req, res) => {
+app.get('/api/admin/stats', authenticateAdmin, async (req, res) => {
   try {
-    db.get('SELECT COUNT(*) as total FROM licenses', [], (err, totalRow) => {
-      if (err) {
-        console.error('Erro ao obter estatísticas:', err);
-        return res.status(500).json({ success: false, message: 'Erro ao obter estatísticas' });
-      }
+    const totalRes = await db.query('SELECT COUNT(*) as total FROM licenses');
+    const activeRes = await db.query('SELECT COUNT(*) as active FROM licenses WHERE status = $1', ['active']);
+    const inactiveRes = await db.query('SELECT COUNT(*) as inactive FROM licenses WHERE status = $1', ['inactive']);
+    const revokedRes = await db.query('SELECT COUNT(*) as revoked FROM licenses WHERE status = $1', ['revoked']);
 
-      db.get('SELECT COUNT(*) as active FROM licenses WHERE status = "active"', [], (err, activeRow) => {
-        db.get('SELECT COUNT(*) as inactive FROM licenses WHERE status = "inactive"', [], (err, inactiveRow) => {
-          db.get('SELECT COUNT(*) as revoked FROM licenses WHERE status = "revoked"', [], (err, revokedRow) => {
-            res.json({
-              success: true,
-              stats: {
-                total: totalRow.total,
-                active: activeRow.active,
-                inactive: inactiveRow.inactive,
-                revoked: revokedRow.revoked
-              }
-            });
-          });
-        });
-      });
+    res.json({
+      success: true,
+      stats: {
+        total: parseInt(totalRes.rows[0].total),
+        active: parseInt(activeRes.rows[0].active),
+        inactive: parseInt(inactiveRes.rows[0].inactive),
+        revoked: parseInt(revokedRes.rows[0].revoked)
+      }
     });
 
   } catch (error) {
@@ -427,11 +372,13 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Iniciar servidor
-app.listen(PORT, () => {
-  console.log(`\n🚀 SETHIR DRAW License Server rodando na porta ${PORT}`);
-  console.log(`📊 Ambiente: ${process.env.NODE_ENV}`);
-  console.log(`🔐 Admin password: ${process.env.ADMIN_PASSWORD}\n`);
+// Inicializar banco de dados e Iniciar servidor
+db.initDb().then(() => {
+  app.listen(PORT, () => {
+    console.log(`\n🚀 SETHIR DRAW License Server rodando na porta ${PORT}`);
+    console.log(`📊 Ambiente: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`🔐 Admin password: ${ADMIN_PASSWORD}\n`);
+  });
 });
 
 module.exports = app;

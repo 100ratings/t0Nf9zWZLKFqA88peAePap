@@ -31,10 +31,15 @@ async function apiRequest(endpoint, options = {}) {
   }
   
   try {
-    const response = await fetch(url, {
+    const fetchOptions = {
       ...options,
       headers
-    });
+    };
+    
+    // Repassar o signal se existir para suportar timeout
+    if (options.signal) fetchOptions.signal = options.signal;
+
+    const response = await fetch(url, fetchOptions);
     
     const data = await response.json();
     
