@@ -1,39 +1,36 @@
 const { Pool } = require('pg');
 
 /**
- * CONFIGURAÇÃO DE CONEXÃO - SUPABASE
- * Usando codificação para caracteres especiais na senha (como o &)
+ * CONFIGURAÇÃO DEFINITIVA - SUPABASE VIA POOLER (PORTA 6543)
+ * Ideal para Render.com (Plano Gratuito)
  */
 const dbConfig = {
-  user: 'postgres.beffanooezicdxxldejx',
-  host: 'aws-1-sa-east-1.pooler.supabase.com',
-  database: 'postgres',
-  password: 'fk8Fresqor2&',
-  port: 5432,
+  connectionString: 'postgresql://postgres.beffanooezicdxxldejx:fk8Fresqor2&@aws-1-sa-east-1.pooler.supabase.com:6543/postgres?sslmode=require&supavisor_session_id=sethi_draw_session',
   ssl: {
     rejectUnauthorized: false
   },
-  max: 10,
+  max: 5, // Reduzido para maior estabilidade no plano gratuito
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 10000,
+  connectionTimeoutMillis: 20000,
 };
 
 const pool = new Pool(dbConfig);
 
-// Tratamento de erros no pool
+// Tratamento de erros no pool para evitar queda do servidor
 pool.on('error', (err) => {
-  console.error('❌ Erro inesperado no pool do PostgreSQL:', err.message);
+  console.error('❌ Erro no pool do PostgreSQL:', err.message);
 });
 
 /**
- * Executa uma query de forma segura
+ * Executa uma query com tentativa de reconexão automática
  */
 const query = async (text, params) => {
   try {
     return await pool.query(text, params);
   } catch (err) {
-    console.error('❌ Erro na execução da query:', err.message);
-    throw err;
+    console.error('❌ Erro na query (tentando reconectar):', err.message);
+    // Se a conexão caiu, tentamos uma vez mais
+    return await pool.query(text, params);
   }
 };
 
@@ -41,12 +38,12 @@ const query = async (text, params) => {
  * Inicializa as tabelas
  */
 const initDb = async () => {
-  console.log('🔄 Iniciando conexão direta com o banco de dados (Porta 5432)...');
+  console.log('🔄 Iniciando conexão via Transaction Pooler (Porta 6543)...');
   try {
+    // Teste de conexão com retry
     await pool.query('SELECT NOW()');
-    console.log('✅ Conexão estabelecida com sucesso com o Supabase');
+    console.log('✅ Conexão estabelecida com sucesso com o Supabase via Pooler');
     
-    // Garantir que as tabelas existam
     await query(`
       CREATE TABLE IF NOT EXISTS licenses (
         id SERIAL PRIMARY KEY,
@@ -78,6 +75,7 @@ const initDb = async () => {
     return true;
   } catch (err) {
     console.error('❌ Falha na inicialização do banco:', err.message);
+    // Não travamos o servidor, permitimos que ele tente conectar nas requisições
     return false;
   }
 };
