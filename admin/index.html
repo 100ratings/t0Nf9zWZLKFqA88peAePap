@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AXIS - Painel Administrativo</title>
+  <link rel="stylesheet" href="admin-style.css">
+</head>
+<body>
+  <!-- Tela de Login -->
+  <div id="loginScreen" class="screen">
+    <div class="login-container">
+      <div class="logo">🔐 AXIS Admin</div>
+      <h1>Painel Administrativo</h1>
+      <p class="subtitle">Digite a senha de administrador</p>
+      
+      <div class="input-group">
+        <input 
+          type="password" 
+          id="adminPassword" 
+          placeholder="Senha"
+          autocomplete="off"
+        />
+      </div>
+      
+      <button id="loginButton" class="btn btn-primary">
+        Entrar
+      </button>
+      
+      <div id="loginMessage" class="message"></div>
+    </div>
+  </div>
+
+  <!-- Painel Principal -->
+  <div id="dashboardScreen" class="screen hidden">
+    <header class="header">
+      <div class="header-content">
+        <h1>🔐 AXIS - Gerenciador de Licenças</h1>
+        <button id="logoutButton" class="btn btn-secondary">Sair</button>
+      </div>
+    </header>
+
+    <main class="main-content">
+      <!-- Estatísticas -->
+      <section class="stats-section">
+        <div class="stat-card">
+          <div class="stat-icon">📊</div>
+          <div class="stat-content">
+            <div class="stat-value" id="statTotal">0</div>
+            <div class="stat-label">Total de Licenças</div>
+          </div>
+        </div>
+        
+        <div class="stat-card active">
+          <div class="stat-icon">✅</div>
+          <div class="stat-content">
+            <div class="stat-value" id="statActive">0</div>
+            <div class="stat-label">Ativas</div>
+          </div>
+        </div>
+        
+        <div class="stat-card inactive">
+          <div class="stat-icon">⏸️</div>
+          <div class="stat-content">
+            <div class="stat-value" id="statInactive">0</div>
+            <div class="stat-label">Inativas</div>
+          </div>
+        </div>
+        
+        <div class="stat-card revoked">
+          <div class="stat-icon">🚫</div>
+          <div class="stat-content">
+            <div class="stat-value" id="statRevoked">0</div>
+            <div class="stat-label">Revogadas</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Ações -->
+      <section class="actions-section">
+        <button id="createLicenseButton" class="btn btn-primary">
+          ➕ Criar Nova Licença
+        </button>
+        <button id="refreshButton" class="btn btn-secondary">
+          🔄 Atualizar
+        </button>
+      </section>
+
+      <!-- Modal de Criar Licença -->
+      <div id="createLicenseModal" class="modal hidden">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2>Criar Nova Licença</h2>
+            <button class="modal-close" onclick="closeCreateModal()">✕</button>
+          </div>
+          <div class="modal-body">
+            <div class="input-group">
+              <label>Nome do Cliente</label>
+              <input 
+                type="text" 
+                id="customerName" 
+                placeholder="Ex: Arthur Silva"
+              />
+            </div>
+            <div class="input-group">
+              <label>Observações (opcional)</label>
+              <textarea 
+                id="customerNotes" 
+                placeholder="Informações adicionais sobre o cliente"
+                rows="3"
+              ></textarea>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeCreateModal()">Cancelar</button>
+            <button id="confirmCreateButton" class="btn btn-primary">Criar Licença</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tabela de Licenças -->
+      <section class="licenses-section">
+        <h2>Licenças Cadastradas</h2>
+        
+        <div class="table-container">
+          <table class="licenses-table">
+            <thead>
+              <tr>
+                <th>Chave</th>
+                <th>Cliente</th>
+                <th>Status</th>
+                <th>Device ID</th>
+                <th>Ativada em</th>
+                <th>Última Validação</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody id="licensesTableBody">
+              <tr>
+                <td colspan="7" class="loading">Carregando licenças...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Modal de Histórico -->
+      <div id="historyModal" class="modal hidden">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2>Histórico de Ativações</h2>
+            <button class="modal-close" onclick="closeHistoryModal()">✕</button>
+          </div>
+          <div class="modal-body">
+            <div id="historyContent" class="history-content">
+              <p class="loading">Carregando histórico...</p>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeHistoryModal()">Fechar</button>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="admin-config.js"></script>
+  <script src="admin-app.js"></script>
+</body>
+</html>

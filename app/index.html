@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>Sethi Draw</title>
+  <link rel="icon" type="image/x-icon" href="./favicon.ico?v=2" />
+  <link rel="apple-touch-icon" href="./apple-touch-icon.png?v=2" />
+  <link rel="manifest" href="./manifest.json?v=2" />
+  <link rel="stylesheet" href="./style.css?v=6.1.2" />
+  <script src="./config.js"></script>
+  <script src="./license-manager.js"></script>
+</head>
+<body>
+  <!-- Tela de Ativação -->
+  <div id="activationScreen">
+    <div class="activation-container">
+      <div class="activation-logo">AXIS</div>
+      <h1 class="activation-title">Ativação</h1>
+      <p class="activation-subtitle">Digite sua chave de licença para liberar o aplicativo</p>
+      
+      <div class="activation-input-group">
+        <input 
+          type="text" 
+          id="licenseInput" 
+          class="activation-input" 
+          placeholder="EX: ARTHUR-001"
+          autocomplete="off"
+          autocapitalize="characters"
+        />
+      </div>
+      
+      <button id="activateButton" class="activation-button">
+        Ativar Licença
+      </button>
+      
+      <div id="activationMessage" class="activation-message"></div>
+      
+      <div class="activation-footer">
+        Entre em contato com o vendedor para obter sua chave de ativação.
+      </div>
+      
+      <div class="activation-device-id">
+        Device ID: <span id="deviceIdDisplay"></span>
+      </div>
+    </div>
+  </div>
+
+  <canvas id="board"></canvas>
+
+  <!-- Visor Unificado (Swipe e Peek) -->
+  <div id="visor" class="visor-container">
+    <div id="visorLine1"></div>
+  </div>
+
+  <!-- Rodapé Personalizável -->
+  <div id="footer" class="footer-container"></div>
+
+  <!-- Painel de Setup (Secreto) -->
+  <section id="setupPanel" class="hidden panel">
+    <div class="panel-header" id="adjTargetName">Peek 1</div>
+    <div id="setupContent">
+      <div class="setup-group">
+        <label>Personalização</label>
+        <div class="setup-grid">
+          <button class="setup-btn setup-btn-target" data-target="visor" onclick="window.setTarget('visor')">Peek 1</button>
+          <button class="setup-btn setup-btn-target" data-target="footer" onclick="window.setTarget('footer')">Peek 2</button>
+          <button class="setup-btn setup-btn-target" data-target="toolbar" onclick="window.setTarget('toolbar')">Toolbar</button>
+          <button class="setup-btn setup-btn-target" data-target="panelSetup" onclick="window.setTarget('panelSetup')">Painel Setup</button>
+          <button class="setup-btn setup-btn-target" data-target="panelTrain" onclick="window.setTarget('panelTrain')">Painel Treino</button>
+        </div>
+        <button class="action-btn" id="editTextBtn" onclick="window.editTargetText()">Editar Conteúdo do Peek 2</button>
+        <button class="action-btn" id="invertOrderBtn" style="display:none" onclick="window.toggleInvertOrder()">Ordem: 4H 05 → 05 4H</button>
+      </div>
+      <div class="setup-group">
+        <label>Posição / Tamanho</label>
+        <div class="control-grid">
+          <button class="ctrl-btn" onclick="window.adjust('y', -5)">↑</button>
+          <button class="ctrl-btn" onclick="window.adjust('x', -5)">←</button>
+          <button class="ctrl-btn" onclick="window.adjust('x', 5)">→</button>
+          <button class="ctrl-btn" onclick="window.adjust('y', 5)">↓</button>
+          <button class="ctrl-btn" onclick="window.adjust('s', 5)">➕</button>
+          <button class="ctrl-btn" onclick="window.adjust('s', -5)">➖</button>
+        </div>
+      </div>
+      <div class="setup-group" id="oControl" style="display:none">
+        <label>Opacidade</label>
+        <div class="setup-grid">
+          <button class="setup-btn" onclick="window.adjust('o', 0.1)">Escurecer</button>
+          <button class="setup-btn" onclick="window.adjust('o', -0.1)">Clarear</button>
+        </div>
+      </div>
+      <button class="action-btn primary" onclick="window.toggleSetup()">Salvar e Sair</button>
+    </div>
+  </section>
+
+  <!-- Painel de Treino -->
+  <section id="trainPanel" class="hidden panel">
+    <div class="train-num" id="trainNumDisplay">1</div>
+    <div class="train-controls">
+      <button class="ctrl-btn" onclick="window.trainStep(-1)">←</button>
+      <button class="action-btn primary" onclick="window.trainSave()">Salvar Número</button>
+      <button class="ctrl-btn" onclick="window.trainStep(1)">→</button>
+    </div>
+    <div class="setup-grid" style="margin-top:10px">
+      <button class="setup-btn" onclick="window.exportGlyphs()">Exportar</button>
+      <button class="setup-btn" onclick="document.getElementById('glyphInput').click()">Importar</button>
+    </div>
+    <input type="file" id="glyphInput" style="display:none" accept=".json" onchange="window.importGlyphs(event)">
+    <button class="action-btn" style="margin-top:10px" onclick="window.toggleTrain()">Sair</button>
+  </section>
+
+  <!-- Toolbar iOS 26 -->
+  <div id="toolbar">
+    <button class="tool-item" id="undoBtn" aria-label="Undo">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"></path><path d="M20 20v-7a4 4 0 0 0-4-4H4"></path></svg>
+    </button>
+    
+    <button class="tool-item" id="clearBtn" aria-label="Clear">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
+    </button>
+
+    <div class="color-separator"></div>
+
+    <div id="swatchGroup">
+      <button class="swatch active" data-color="#111111" style="--c:#111111"></button>
+      <button class="swatch" data-color="#F7C600" style="--c:#F7C600"></button>
+      <button class="swatch" data-color="#2FD36B" style="--c:#2FD36B"></button>
+      <button class="swatch" data-color="#FF3B30" style="--c:#FF3B30"></button>
+      <button class="swatch" data-color="#007AFF" style="--c:#007AFF"></button>
+    </div>
+  </div>
+
+  <script src="./activation-init.js"></script>
+  <script src="./app.js?v=6.1.2"></script>
+</body>
+</html>
