@@ -254,10 +254,10 @@ html, body {
 
 .activation-input {
   width: 100%;
-  padding: 16px 20px;
+  padding: 20px; /* Aumentamos o preenchimento */
   border: 2px solid #e5e5ea;
   border-radius: 16px;
-  font-size: 16px;
+  font-size: 18px; /* Fonte maior para facilitar leitura */
   font-weight: 600;
   text-align: center;
   text-transform: uppercase;
@@ -265,6 +265,9 @@ html, body {
   transition: all 0.3s ease;
   background: #f9f9f9;
   color: #1c1c1e;
+  position: relative; /* Garante que está na camada correta */
+  z-index: 10001; /* Fica acima de tudo */
+  pointer-events: auto !important; /* Força o clique a funcionar */
 }
 
 .activation-input:focus {
