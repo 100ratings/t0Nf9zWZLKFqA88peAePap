@@ -170,6 +170,17 @@ app.post('/api/license/activate', async (req, res) => {
     if (!license) return res.status(404).json({ success: false, message: 'Chave inválida' });
     if (license.status === 'revoked') return res.status(403).json({ success: false, message: 'Licença revogada' });
 
+    const { force } = req.body;
+    
+    // Se a licença já tiver um device_id e não for o mesmo dispositivo, e não houver confirmação de força
+    if (license.device_id && license.device_id !== device_id && !force) {
+      return res.status(409).json({ 
+        success: false, 
+        needsConfirmation: true,
+        message: 'Esta licença já está ativa em outro dispositivo. Se continuar, o acesso no outro aparelho será bloqueado.' 
+      });
+    }
+
     // Atualizar
     await db.query(
       `UPDATE licenses SET 
