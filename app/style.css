@@ -8,6 +8,10 @@
 * { 
   box-sizing: border-box; 
   -webkit-tap-highlight-color: transparent; 
+}
+
+/* Desabilitar seleção e touch apenas em elementos que não são interativos */
+body, #board, .visor-container, .footer-container, .panel-header, .setup-group label {
   user-select: none;
   -webkit-user-select: none;
   touch-action: none;
@@ -254,10 +258,10 @@ html, body {
 
 .activation-input {
   width: 100%;
-  padding: 20px; /* Aumentamos o preenchimento */
+  padding: 20px;
   border: 2px solid #e5e5ea;
   border-radius: 16px;
-  font-size: 18px; /* Fonte maior para facilitar leitura */
+  font-size: 18px;
   font-weight: 600;
   text-align: center;
   text-transform: uppercase;
@@ -265,12 +269,12 @@ html, body {
   transition: all 0.3s ease;
   background: #f9f9f9;
   color: #1c1c1e;
-
-  position: relative; /* Garante que está na camada correta */
-  z-index: 10001;     /* Fica acima de overlays comuns */
+  position: relative;
+  z-index: 10001;
   pointer-events: auto !important;
-  -webkit-user-select: text;
-  user-select: text;
+  -webkit-user-select: text !important;
+  user-select: text !important;
+  touch-action: manipulation !important;
 }
 
 .activation-input:focus {
