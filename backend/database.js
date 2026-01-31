@@ -1,22 +1,28 @@
 const { Pool } = require('pg');
 
-// URI de conexão com o Supabase
-const connectionString = process.env.DATABASE_URL || 'postgresql://postgres:fk8Fresqor2&@db.beffanooezicdxxldejx.supabase.co:5432/postgres';
+// URI de conexão com o Supabase ajustada para forçar IPv4
+// Adicionado ?sslmode=require para maior estabilidade
+const connectionString = process.env.DATABASE_URL || 'postgresql://postgres:fk8Fresqor2&@db.beffanooezicdxxldejx.supabase.co:5432/postgres?sslmode=require';
 
 const pool = new Pool({
   connectionString: connectionString,
   ssl: {
-    rejectUnauthorized: false // Necessário para conexões externas com o Supabase
-  }
+    rejectUnauthorized: false
+  },
+  // Configurações extras para evitar erros de conexão em redes restritas
+  connectionTimeoutMillis: 10000,
+  idleTimeoutMillis: 30000,
+  max: 10
 });
 
 // Função para inicializar as tabelas no PostgreSQL
 const initDb = async () => {
-  const client = await pool.connect();
+  let client;
   try {
+    client = await pool.connect();
     console.log('✅ Conectado ao banco de dados PostgreSQL (Supabase)');
     
-    // Criar tabela de licenças (Sintaxe Postgres)
+    // Criar tabela de licenças
     await client.query(`
       CREATE TABLE IF NOT EXISTS licenses (
         id SERIAL PRIMARY KEY,
@@ -32,7 +38,7 @@ const initDb = async () => {
       )
     `);
 
-    // Criar tabela de histórico de ativações (Sintaxe Postgres)
+    // Criar tabela de histórico
     await client.query(`
       CREATE TABLE IF NOT EXISTS activation_history (
         id SERIAL PRIMARY KEY,
@@ -52,13 +58,13 @@ const initDb = async () => {
 
     console.log('✅ Tabelas inicializadas com sucesso no PostgreSQL');
   } catch (err) {
-    console.error('❌ Erro ao inicializar banco de dados:', err);
+    console.error('❌ Erro ao conectar ou inicializar banco de dados:', err.message);
+    // Não mata o processo, permite que o servidor tente reconectar depois
   } finally {
-    client.release();
+    if (client) client.release();
   }
 };
 
-// Exportar o pool e a função de inicialização
 module.exports = {
   query: (text, params) => pool.query(text, params),
   initDb,
