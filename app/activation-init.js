@@ -73,11 +73,11 @@
   
   if (isActivated) {
     console.log('✅ Licença já ativada para:', licenseManager.getCustomerName());
-    
-    // Esconder tela de ativação imediatamente
-    activationScreen.style.display = 'none';
+    // Mantém escondido (display: none já vem do CSS)
   } else {
     console.log('⚠️ Aplicativo não ativado. Aguardando licença...');
+    // Só mostra se NÃO estiver ativado
+    activationScreen.style.display = 'flex';
   }
 
   // Validação periódica (a cada 5 minutos)
