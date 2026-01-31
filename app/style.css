@@ -265,9 +265,12 @@ html, body {
   transition: all 0.3s ease;
   background: #f9f9f9;
   color: #1c1c1e;
+
   position: relative; /* Garante que está na camada correta */
-  z-index: 10001; /* Fica acima de tudo */
-  pointer-events: auto !important; /* Força o clique a funcionar */
+  z-index: 10001;     /* Fica acima de overlays comuns */
+  pointer-events: auto !important;
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 .activation-input:focus {
@@ -295,7 +298,9 @@ html, body {
   cursor: pointer;
   transition: all 0.3s ease;
   box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+
   position: relative;
+  z-index: 10000; /* abaixo do input, pra não “roubar” toque */
   overflow: hidden;
 }
 
