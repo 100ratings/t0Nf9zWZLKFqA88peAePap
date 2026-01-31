@@ -1,28 +1,25 @@
 const { Pool } = require('pg');
 
-// URI de conexão com o Supabase ajustada para forçar IPv4
-// Adicionado ?sslmode=require para maior estabilidade
-const connectionString = process.env.DATABASE_URL || 'postgresql://postgres:fk8Fresqor2&@db.beffanooezicdxxldejx.supabase.co:5432/postgres?sslmode=require';
+// URI do Transaction Pooler do Supabase (Ideal para o Render)
+const connectionString = process.env.DATABASE_URL || 'postgresql://postgres.beffanooezicdxxldejx:fk8Fresqor2&@aws-1-sa-east-1.pooler.supabase.com:6543/postgres?sslmode=require';
 
 const pool = new Pool({
   connectionString: connectionString,
   ssl: {
     rejectUnauthorized: false
   },
-  // Configurações extras para evitar erros de conexão em redes restritas
-  connectionTimeoutMillis: 10000,
+  // Configurações otimizadas para Pooler
+  max: 20,
   idleTimeoutMillis: 30000,
-  max: 10
+  connectionTimeoutMillis: 5000,
 });
 
-// Função para inicializar as tabelas no PostgreSQL
 const initDb = async () => {
   let client;
   try {
     client = await pool.connect();
-    console.log('✅ Conectado ao banco de dados PostgreSQL (Supabase)');
+    console.log('✅ Conectado ao banco de dados PostgreSQL via Pooler (Supabase)');
     
-    // Criar tabela de licenças
     await client.query(`
       CREATE TABLE IF NOT EXISTS licenses (
         id SERIAL PRIMARY KEY,
@@ -38,7 +35,6 @@ const initDb = async () => {
       )
     `);
 
-    // Criar tabela de histórico
     await client.query(`
       CREATE TABLE IF NOT EXISTS activation_history (
         id SERIAL PRIMARY KEY,
@@ -51,15 +47,13 @@ const initDb = async () => {
       )
     `);
 
-    // Criar índices
     await client.query(`CREATE INDEX IF NOT EXISTS idx_license_key ON licenses(license_key)`);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_device_id ON licenses(device_id)`);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_status ON licenses(status)`);
 
     console.log('✅ Tabelas inicializadas com sucesso no PostgreSQL');
   } catch (err) {
-    console.error('❌ Erro ao conectar ou inicializar banco de dados:', err.message);
-    // Não mata o processo, permite que o servidor tente reconectar depois
+    console.error('❌ Erro de conexão com o banco de dados:', err.message);
   } finally {
     if (client) client.release();
   }
