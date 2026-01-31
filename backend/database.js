@@ -1,48 +1,41 @@
 const { Pool } = require('pg');
 
 /**
- * CONFIGURAÇÃO DEFINITIVA - SUPABASE VIA POOLER (PORTA 6543)
- * Ideal para Render.com (Plano Gratuito)
+ * CONFIGURAÇÃO V8 - SUPABASE VIA POOLER (PORTA 6543)
+ * Correção para erro de certificado SSL no Render
  */
 const dbConfig = {
-  connectionString: 'postgresql://postgres.beffanooezicdxxldejx:fk8Fresqor2&@aws-1-sa-east-1.pooler.supabase.com:6543/postgres?sslmode=require&supavisor_session_id=sethi_draw_session',
+  connectionString: 'postgresql://postgres.beffanooezicdxxldejx:fk8Fresqor2&@aws-1-sa-east-1.pooler.supabase.com:6543/postgres?sslmode=require',
   ssl: {
-    rejectUnauthorized: false
+    // Esta é a chave para resolver o erro "self-signed certificate"
+    rejectUnauthorized: false 
   },
-  max: 5, // Reduzido para maior estabilidade no plano gratuito
+  max: 5,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 20000,
 };
 
 const pool = new Pool(dbConfig);
 
-// Tratamento de erros no pool para evitar queda do servidor
 pool.on('error', (err) => {
   console.error('❌ Erro no pool do PostgreSQL:', err.message);
 });
 
-/**
- * Executa uma query com tentativa de reconexão automática
- */
 const query = async (text, params) => {
   try {
     return await pool.query(text, params);
   } catch (err) {
-    console.error('❌ Erro na query (tentando reconectar):', err.message);
-    // Se a conexão caiu, tentamos uma vez mais
-    return await pool.query(text, params);
+    console.error('❌ Erro na query:', err.message);
+    throw err;
   }
 };
 
-/**
- * Inicializa as tabelas
- */
 const initDb = async () => {
-  console.log('🔄 Iniciando conexão via Transaction Pooler (Porta 6543)...');
+  console.log('🔄 Iniciando conexão via Transaction Pooler (V8)...');
   try {
-    // Teste de conexão com retry
+    // Teste de conexão
     await pool.query('SELECT NOW()');
-    console.log('✅ Conexão estabelecida com sucesso com o Supabase via Pooler');
+    console.log('✅ Conexão estabelecida com sucesso com o Supabase!');
     
     await query(`
       CREATE TABLE IF NOT EXISTS licenses (
@@ -75,7 +68,6 @@ const initDb = async () => {
     return true;
   } catch (err) {
     console.error('❌ Falha na inicialização do banco:', err.message);
-    // Não travamos o servidor, permitimos que ele tente conectar nas requisições
     return false;
   }
 };
