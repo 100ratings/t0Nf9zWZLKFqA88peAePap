@@ -422,14 +422,14 @@ app.get('/api/admin/stats', authenticateAdmin, (req, res) => {
 app.get('/api/health', (req, res) => {
   res.json({ 
     success: true, 
-    message: 'AXIS License Server está rodando!',
+    message: 'SETHIR DRAW License Server está rodando!',
     timestamp: new Date().toISOString()
   });
 });
 
 // Iniciar servidor
 app.listen(PORT, () => {
-  console.log(`\n🚀 AXIS License Server rodando na porta ${PORT}`);
+  console.log(`\n🚀 SETHIR DRAW License Server rodando na porta ${PORT}`);
   console.log(`📊 Ambiente: ${process.env.NODE_ENV}`);
   console.log(`🔐 Admin password: ${process.env.ADMIN_PASSWORD}\n`);
 });
