@@ -1,7 +1,7 @@
 // Configuração da API para o Painel Administrativo
 const ADMIN_API_CONFIG = {
   // IMPORTANTE: Altere esta URL para o endereço do seu servidor em produção
-  BASE_URL: 'http://localhost:3000/api',
+  BASE_URL: 'https://t0nf9zwzlkfqa88peaepap.onrender.com/api',
   
   // Endpoints
   ENDPOINTS: {
