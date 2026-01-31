@@ -130,7 +130,12 @@ async function loadLicenses() {
       
       licensesTableBody.innerHTML = data.licenses.map(license => `
         <tr>
-          <td><span class="license-key">${license.license_key}</span></td>
+          <td>
+            <div class="license-cell">
+              <span class="license-key">${license.license_key}</span>
+              <button class="btn-copy" onclick="copyToClipboard('${license.license_key}', this)" title="Copiar chave">📋</button>
+            </div>
+          </td>
           <td>${license.customer_name}</td>
           <td><span class="status-badge ${license.status}">${getStatusText(license.status)}</span></td>
           <td><span class="device-id" title="${license.device_id || '-'}">${license.device_id || '-'}</span></td>
@@ -301,6 +306,31 @@ function getActionText(action) {
 
 function closeHistoryModal() {
   historyModal.classList.add('hidden');
+}
+
+// Função para copiar para a área de transferência
+async function copyToClipboard(text, btn) {
+  try {
+    await navigator.clipboard.writeText(text);
+    const originalText = btn.textContent;
+    btn.textContent = '✅';
+    btn.classList.add('success');
+    
+    setTimeout(() => {
+      btn.textContent = originalText;
+      btn.classList.remove('success');
+    }, 2000);
+  } catch (err) {
+    console.error('Erro ao copiar:', err);
+    // Fallback para navegadores antigos ou sem permissão
+    const input = document.createElement('input');
+    input.value = text;
+    document.body.appendChild(input);
+    input.select();
+    document.execCommand('copy');
+    document.body.removeChild(input);
+    alert('Copiado para a área de transferência!');
+  }
 }
 
 // Event Listeners

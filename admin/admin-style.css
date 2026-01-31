@@ -534,3 +534,38 @@ body {
     padding: 10px;
   }
 }
+
+/* Novos estilos para o botão de copiar */
+.license-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.btn-copy {
+  background: #f2f2f7;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 14px;
+}
+
+.btn-copy:hover {
+  background: #e5e5ea;
+  transform: scale(1.05);
+}
+
+.btn-copy:active {
+  transform: scale(0.95);
+}
+
+.btn-copy.success {
+  background: rgba(52, 199, 89, 0.1);
+  border-color: var(--success);
+}
