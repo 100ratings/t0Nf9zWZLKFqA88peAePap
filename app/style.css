@@ -11,10 +11,16 @@
 }
 
 /* Desabilitar seleção e touch apenas em elementos que não são interativos */
-body, #board, .visor-container, .footer-container, .panel-header, .setup-group label {
+#board, .visor-container, .footer-container, .panel-header, .setup-group label {
   user-select: none;
   -webkit-user-select: none;
   touch-action: none;
+}
+
+body {
+  user-select: none;
+  -webkit-user-select: none;
+  /* Removido touch-action: none para não quebrar cliques no iOS */
 }
 
 html, body {
@@ -274,7 +280,7 @@ html, body {
   pointer-events: auto !important;
   -webkit-user-select: text !important;
   user-select: text !important;
-  touch-action: manipulation !important;
+  touch-action: auto !important; /* Garantir comportamento padrão de toque */
 }
 
 .activation-input:focus {

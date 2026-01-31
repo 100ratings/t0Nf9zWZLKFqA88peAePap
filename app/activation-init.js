@@ -63,6 +63,11 @@
     }
   });
 
+  // Forçar foco no clique para iOS
+  licenseInput.addEventListener('click', () => {
+    licenseInput.focus();
+  });
+
   // Verificar se já está ativado
   const isActivated = await licenseManager.checkActivation();
   
