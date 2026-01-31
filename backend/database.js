@@ -1,17 +1,16 @@
 const { Pool } = require('pg');
 
 /**
- * CONFIGURAÇÃO DE BANCO DE DATAS - SUPABASE
- * Correção para erro de certificado SSL no Render
+ * CONFIGURAÇÃO DE BANCO DE DADOS - SUPABASE / RENDER
+ * Esta configuração resolve problemas de SSL e facilita a troca da URL de conexão.
  */
 
-// Forçar a desativação da verificação de TLS para certificados autoassinados
-// Isso resolve o erro "self-signed certificate in certificate chain"
+// Desativa a verificação de TLS para aceitar certificados autoassinados (comum no Render/Supabase)
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
 const dbConfig = {
-  // Nota: A URL abaixo deve ser a sua URL de conexão do Supabase (Transaction Pooler)
-  connectionString: 'postgresql://postgres.beffanooezicdxxldejx:fk8Fresqor2&@aws-0-sa-east-1.pooler.supabase.com:6543/postgres',
+  // Prioriza a variável de ambiente DATABASE_URL do Render
+  connectionString: process.env.DATABASE_URL || 'postgresql://postgres.beffanooezicdxxldejx:fk8Fresqor2&@aws-0-sa-east-1.pooler.supabase.com:6543/postgres',
   ssl: {
     rejectUnauthorized: false 
   },
@@ -73,7 +72,17 @@ const initDb = async () => {
     return true;
   } catch (err) {
     console.error('❌ Falha na inicialização do banco:', err.message);
-    console.log('💡 Dica: Verifique se a URL de conexão no arquivo database.js está correta e se o banco está ativo.');
+    
+    if (err.message.includes('Tenant or user not found')) {
+      console.log('\n--- 💡 DICA DE SOLUÇÃO ---');
+      console.log('O erro "Tenant or user not found" indica que a URL de conexão está incorreta.');
+      console.log('1. Vá ao painel do Supabase > Project Settings > Database.');
+      console.log('2. Procure por "Connection String" e selecione a aba "URI".');
+      console.log('3. Certifique-se de usar o modo "Transaction" (porta 6543).');
+      console.log('4. No Render, adicione uma variável de ambiente chamada DATABASE_URL com essa nova URI.');
+      console.log('---------------------------\n');
+    }
+    
     return false;
   }
 };
