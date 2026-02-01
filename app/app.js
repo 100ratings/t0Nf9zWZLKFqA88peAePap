@@ -196,7 +196,9 @@
       if (mode === "train") {
         const rx = cfg.number.x * W / 100, ry = cfg.number.y * H / 100;
         const rw = cfg.number.s * W / 100, rh = cfg.number.h * H / 100;
-        if (p.x < rx || p.x > rx + rw || p.y < ry || p.y > ry + rh) return;
+        // Aumentar a margem de detecção em 20px para facilitar o desenho em telas pequenas
+        const margin = 20;
+        if (p.x < rx - margin || p.x > rx + rw + margin || p.y < ry - margin || p.y > ry + rh + margin) return;
       }
       currentStroke = { c: mode === "train" ? "#111111" : color, p: [p] };
     };
@@ -403,7 +405,13 @@
   };
 
   window.openTrainPanel = () => { window.setTarget('panelTrain'); closeOtherPanels(); mode = "train"; trainPanel.classList.remove("hidden"); loadTrain(trainNum || 1); applyCfg(); };
-  window.toggleTrain = () => { mode = "draw"; trainPanel.classList.add("hidden"); applyCfg(); render(); };
+  window.toggleTrain = () => { 
+    mode = "draw"; 
+    strokes = []; // Limpa os desenhos temporários ao sair
+    trainPanel.classList.add("hidden"); 
+    applyCfg(); 
+    render(); 
+  };
   window.setAdjustMode = (m) => {
     adjustMode = m;
     document.getElementById("modeNumBtn").classList.toggle("active", m === 'number');
