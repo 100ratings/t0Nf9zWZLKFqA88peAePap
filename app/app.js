@@ -194,11 +194,8 @@
       const p = getPt(e); e.preventDefault();
       if (mode === "swipe") { swipeData.start = p; return; }
       if (mode === "train") {
-        const rx = cfg.number.x * W / 100, ry = cfg.number.y * H / 100;
-        const rw = cfg.number.s * W / 100, rh = cfg.number.h * H / 100;
-        // Aumentar a margem de detecção em 20px para facilitar o desenho em telas pequenas
-        const margin = 20;
-        if (p.x < rx - margin || p.x > rx + rw + margin || p.y < ry - margin || p.y > ry + rh + margin) return;
+        // No modo treino, permitimos desenhar em qualquer lugar da tela que não seja o painel
+        // A restrição anterior impedia o desenho se o usuário começasse fora da caixa do número
       }
       currentStroke = { c: mode === "train" ? "#111111" : color, p: [p] };
     };
@@ -407,7 +404,6 @@
   window.openTrainPanel = () => { window.setTarget('panelTrain'); closeOtherPanels(); mode = "train"; trainPanel.classList.remove("hidden"); loadTrain(trainNum || 1); applyCfg(); };
   window.toggleTrain = () => { 
     mode = "draw"; 
-    strokes = []; // Limpa os desenhos temporários ao sair
     trainPanel.classList.add("hidden"); 
     applyCfg(); 
     render(); 
