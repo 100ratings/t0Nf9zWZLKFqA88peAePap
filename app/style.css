@@ -20,7 +20,6 @@
 body {
   user-select: none;
   -webkit-user-select: none;
-  /* Removido touch-action: none para não quebrar cliques no iOS */
 }
 
 html, body {
@@ -43,6 +42,17 @@ html, body {
   background: #fff;
   z-index: 1;
 }
+
+/* Aviso de Orientação */
+#orientationWarning {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(0, 0, 0, 0.9); z-index: 9999;
+  display: flex; align-items: center; justify-content: center; text-align: center;
+  color: white; padding: 20px;
+}
+#orientationWarning.hidden { display: none; }
+.warning-content svg { margin-bottom: 15px; animation: rotate 2s infinite ease-in-out; }
+@keyframes rotate { 0% { transform: rotate(0deg); } 50% { transform: rotate(-90deg); } 100% { transform: rotate(0deg); } }
 
 /* Toolbar iOS 26 - Floating Pill */
 #toolbar {
@@ -74,8 +84,7 @@ html, body {
   background: transparent;
   color: #fff;
   display: flex;
-  align-items: center;
-  justify-content: center;
+  align-items: center; justify-content: center;
   transition: all 0.2s ease;
 }
 
@@ -91,7 +100,7 @@ html, body {
 #swatchGroup {
   display: flex;
   align-items: center;
-  gap: 14px; /* Espaçamento generoso solicitado */
+  gap: 14px;
   padding: 0 6px;
 }
 
@@ -128,15 +137,11 @@ html, body {
 }
 
 .footer-container {
-  opacity: 1; /* Rodapé sempre visível por padrão */
+  opacity: 1;
   font-weight: 400;
-  width: auto; /* Largura automática para não limitar o texto */
-  white-space: nowrap; /* Garante que o texto fique em uma única linha */
-  min-width: 100%; /* Garante centralização baseada no transform */
-}
-
-#visorLine1 {
-  margin: 0;
+  width: auto;
+  white-space: nowrap;
+  min-width: 100%;
 }
 
 /* Painéis (Setup e Treino) */
@@ -147,28 +152,60 @@ html, body {
   transform: translateX(-50%);
   width: 380px;
   max-width: 90%;
+  max-height: 80vh;
   background: rgba(255, 255, 255, 0.6);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   border-radius: 28px;
-  padding: 24px;
+  padding: 0;
   z-index: 2000;
   box-shadow: 0 20px 60px rgba(0,0,0,0.15);
   border: 0.5px solid rgba(0,0,0,0.08);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  touch-action: pan-y;
 }
 
-.panel.hidden { display: none; }
-.panel-header { font-size: 19px; font-weight: 700; text-align: center; margin-bottom: 20px; }
+.panel.hidden { display: none !important; }
+.panel.transparent-peek { opacity: 0.05 !important; transition: opacity 0.2s ease; pointer-events: none; }
 
-.setup-group { margin-bottom: 20px; }
+.panel-header { 
+  padding: 24px 24px 16px;
+  font-size: 19px; font-weight: 700; text-align: center;
+  border-bottom: 0.5px solid rgba(0,0,0,0.05);
+  flex-shrink: 0;
+}
+
+.scroll-content {
+  padding: 16px 24px 24px;
+  overflow-y: auto;
+  flex-grow: 1;
+  -webkit-overflow-scrolling: touch;
+  pointer-events: auto;
+}
+.scroll-content::-webkit-scrollbar { width: 4px; }
+.scroll-content::-webkit-scrollbar-track { background: transparent; }
+.scroll-content::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); border-radius: 10px; }
+
+.panel-footer {
+  padding: 16px 24px 24px;
+  border-top: 0.5px solid rgba(0,0,0,0.05);
+  flex-shrink: 0;
+}
+
+.setup-group { margin: 20px 0; }
 .setup-group label { display: block; font-size: 13px; font-weight: 600; color: #8e8e93; text-transform: uppercase; margin-bottom: 10px; }
 
 .setup-grid, .control-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
 .control-grid { grid-template-columns: repeat(3, 1fr); }
 
-.setup-btn, .ctrl-btn, .action-btn {
+.setup-btn, .ctrl-btn, .action-btn, .mini-btn, .card-btn {
   border: 0; padding: 14px; border-radius: 14px; background: #f2f2f7; font-weight: 600; color: #1c1c1e; font-size: 14px;
+  transition: all 0.2s ease;
+  display: flex; align-items: center; justify-content: center; text-align: center;
 }
+.setup-btn.active, .mini-btn.active, .card-btn.active { background: var(--accent) !important; color: #fff !important; }
 
 .action-btn { width: 100%; margin-top: 10px; }
 .action-btn.primary { background: var(--accent); color: #fff; }
@@ -176,278 +213,64 @@ html, body {
 .train-num { font-size: 54px; font-weight: 800; text-align: center; color: var(--accent); margin-bottom: 20px; }
 .train-controls { display: flex; align-items: center; gap: 12px; }
 
-/* Guia Visual do Número no Setup */
-#numberGuide {
-  position: absolute;
-  border: 2px dashed var(--accent);
-  background: rgba(0, 122, 255, 0.05);
-  pointer-events: none;
-  z-index: 400;
-  display: none;
+/* Seletor de Cartas */
+.card-input-display {
+  background: #f2f2f7; padding: 15px; border-radius: 15px;
+  text-align: center; font-size: 24px; font-weight: 800; margin-bottom: 15px;
+  color: var(--accent); letter-spacing: 2px;
 }
+.card-grid { display: grid; gap: 6px; }
+.card-grid.values { grid-template-columns: repeat(5, 1fr); }
+.card-grid.suits { grid-template-columns: repeat(4, 1fr); }
+.card-grid.digits { grid-template-columns: repeat(5, 1fr); }
+
+.card-btn { padding: 12px 5px; font-size: 14px; }
+
+/* Estilos para o Botão de Olho (Transparência) */
+.eye-button {
+  background: transparent; border: none; color: #8e8e93; padding: 5px;
+  display: flex; align-items: center; justify-content: center;
+  transition: color 0.2s ease, transform 0.1s ease; border-radius: 50%;
+}
+.eye-button svg { width: 28px; height: 28px; }
+.eye-button:active { color: var(--accent); transform: scale(0.9); }
 
 /* ==================== TELA DE ATIVAÇÃO ==================== */
 #activationScreen {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  z-index: 9999;
-  display: none; /* Começa escondido para evitar flash */
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-  opacity: 1;
-  transition: opacity 0.5s ease;
+  z-index: 9999; display: none; flex-direction: column; align-items: center; justify-content: center; padding: 20px;
 }
-
-#activationScreen.hidden {
-  opacity: 0;
-  pointer-events: none;
-}
-
 .activation-container {
-  width: 100%;
-  max-width: 400px;
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border-radius: 30px;
-  padding: 40px 30px;
-  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.3);
+  width: 100%; max-width: 400px; background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  border-radius: 30px; padding: 40px 30px; box-shadow: 0 30px 80px rgba(0, 0, 0, 0.3);
   text-align: center;
-  animation: slideUp 0.6s ease;
 }
-
-@keyframes slideUp {
-  from {
-    opacity: 0;
-    transform: translateY(50px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.activation-logo {
-  font-size: 48px;
-  font-weight: 900;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  margin-bottom: 10px;
-  letter-spacing: -1px;
-}
-
-.activation-title {
-  font-size: 24px;
-  font-weight: 700;
-  color: #1c1c1e;
-  margin-bottom: 10px;
-}
-
-.activation-subtitle {
-  font-size: 15px;
-  color: #8e8e93;
-  margin-bottom: 30px;
-  line-height: 1.4;
-}
-
-.activation-input-group {
-  margin-bottom: 20px;
-}
-
+.activation-logo { font-size: 48px; font-weight: 900; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 10px; }
+.activation-title { font-size: 24px; font-weight: 700; color: #1c1c1e; margin-bottom: 10px; }
+.activation-subtitle { font-size: 15px; color: #8e8e93; margin-bottom: 30px; line-height: 1.4; }
 .activation-input {
-  width: 100%;
-  padding: 20px;
-  border: 2px solid #e5e5ea;
-  border-radius: 16px;
-  font-size: 18px;
-  font-weight: 600;
-  text-align: center;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  transition: all 0.3s ease;
-  background: #f9f9f9;
-  color: #1c1c1e;
-  position: relative;
-  z-index: 10001;
-  pointer-events: auto !important;
-  -webkit-user-select: text !important;
-  user-select: text !important;
-  touch-action: auto !important; /* Garantir comportamento padrão de toque */
+  width: 100%; padding: 20px; border: 2px solid #e5e5ea; border-radius: 16px;
+  font-size: 18px; font-weight: 600; text-align: center; text-transform: uppercase;
+  background: #f9f9f9; color: #1c1c1e; cursor: text !important;
 }
-
-.activation-input:focus {
-  outline: none;
-  border-color: #667eea;
-  background: #fff;
-  box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
-}
-
-.activation-input::placeholder {
-  color: #c7c7cc;
-  text-transform: none;
-  letter-spacing: 0;
-}
-
 .activation-button {
-  width: 100%;
-  padding: 18px;
-  border: none;
-  border-radius: 16px;
-  font-size: 17px;
-  font-weight: 700;
-  color: #fff;
+  width: 100%; padding: 18px; border: none; border-radius: 16px;
+  font-size: 17px; font-weight: 700; color: #fff;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  cursor: pointer;
-  transition: all 0.3s ease;
-  box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
-
-  position: relative;
-  z-index: 10000; /* abaixo do input, pra não “roubar” toque */
-  overflow: hidden;
 }
-
-.activation-button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 15px 40px rgba(102, 126, 234, 0.5);
-}
-
-.activation-button:active {
-  transform: translateY(0);
-  box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
-}
-
-.activation-button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  transform: none;
-}
-
-.activation-message {
-  margin-top: 20px;
-  padding: 12px 16px;
-  border-radius: 12px;
-  font-size: 14px;
-  font-weight: 600;
-  opacity: 0;
-  transform: translateY(-10px);
-  transition: all 0.3s ease;
-}
-
-.activation-message.show {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-.activation-message.success {
-  background: rgba(52, 199, 89, 0.15);
-  color: #34c759;
-  border: 1px solid rgba(52, 199, 89, 0.3);
-}
-
-.activation-message.error {
-  background: rgba(255, 59, 48, 0.15);
-  color: #ff3b30;
-  border: 1px solid rgba(255, 59, 48, 0.3);
-}
-
-.activation-footer {
-  margin-top: 30px;
-  font-size: 12px;
-  color: #8e8e93;
-  line-height: 1.5;
-}
-
-.activation-device-id {
-  margin-top: 20px;
-  padding: 12px;
-  background: rgba(0, 0, 0, 0.05);
-  border-radius: 10px;
-  font-size: 11px;
-  color: #8e8e93;
-  font-family: 'SF Mono', 'Monaco', 'Courier New', monospace;
-  word-break: break-all;
-}
-
-/* Loading spinner */
-.spinner {
-  display: inline-block;
-  width: 16px;
-  height: 16px;
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  border-top-color: #fff;
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-  margin-right: 8px;
-  vertical-align: middle;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
+.activation-footer { margin-top: 30px; font-size: 12px; color: #8e8e93; line-height: 1.5; }
+.activation-device-id { margin-top: 20px; padding: 12px; background: rgba(0, 0, 0, 0.05); border-radius: 10px; font-size: 11px; color: #8e8e93; font-family: monospace; }
 
 /* Estilos para Instalação Obrigatória */
-.install-instructions {
-  text-align: left;
-  margin: 20px 0;
-  background: #f2f2f7;
-  padding: 20px;
-  border-radius: 20px;
-}
-
-.install-instructions .step {
-  display: flex;
-  align-items: center;
-  gap: 15px;
-  margin-bottom: 15px;
-  font-size: 14px;
-  color: #1c1c1e;
-}
-
-.install-instructions .step:last-child {
-  margin-bottom: 0;
-}
-
-.step-num {
-  background: var(--accent);
-  color: #fff;
-  width: 24px;
-  height: 24px;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
-  font-size: 12px;
-  flex-shrink: 0;
-}
-
 #installScreen {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  z-index: 10000;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
+  z-index: 10000; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px;
 }
+.install-instructions { text-align: left; margin: 20px 0; background: #f2f2f7; padding: 20px; border-radius: 20px; }
+.install-instructions .step { display: flex; align-items: center; gap: 15px; margin-bottom: 15px; font-size: 14px; color: #1c1c1e; }
+.step-num { background: var(--accent); color: #fff; width: 24px; height: 24px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12px; }
 
-#installScreen.hidden {
-  display: none;
-}
-
-#activationForm.hidden, #confirmSwap.hidden {
-  display: none;
-}
+.hidden { display: none !important; }

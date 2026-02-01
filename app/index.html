@@ -14,6 +14,14 @@
   <script src="./license-manager.js"></script>
 </head>
 <body>
+  <!-- Aviso de Orientação -->
+  <div id="orientationWarning" class="hidden">
+    <div class="warning-content">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
+      <p>Por favor, use o app em modo vertical (Portrait)</p>
+    </div>
+  </div>
+
   <!-- Tela de Instrução para Tela de Início -->
   <div id="installScreen" class="hidden">
     <div class="activation-container">
@@ -57,6 +65,7 @@
             autofocus
             inputmode="text"
             enterkeyhint="done"
+            style="cursor: text !important;"
           />
         </div>
         
@@ -99,20 +108,46 @@
 
   <!-- Painel de Setup (Secreto) -->
   <section id="setupPanel" class="hidden panel">
-    <div class="panel-header" id="adjTargetName">Peek 1</div>
-    <div id="setupContent">
+    <div class="panel-header" style="display: flex; align-items: center; justify-content: center; gap: 10px; position: relative;">
+      <span>Configurações do App</span>
+      <button id="eyeBtn" class="eye-button" aria-label="Ver o que está por baixo">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+      </button>
+    </div>
+    <div id="setupContent" class="scroll-content">
       <div class="setup-group">
         <label>Personalização</label>
         <div class="setup-grid">
-          <button class="setup-btn setup-btn-target" data-target="visor" onclick="window.setTarget('visor')">Peek 1</button>
-          <button class="setup-btn setup-btn-target" data-target="footer" onclick="window.setTarget('footer')">Peek 2</button>
-          <button class="setup-btn setup-btn-target" data-target="toolbar" onclick="window.setTarget('toolbar')">Toolbar</button>
-          <button class="setup-btn setup-btn-target" data-target="panelSetup" onclick="window.setTarget('panelSetup')">Painel Setup</button>
-          <button class="setup-btn setup-btn-target" data-target="panelTrain" onclick="window.setTarget('panelTrain')">Painel Treino</button>
+          <button class="setup-btn setup-btn-target" data-target="panelSetup" onclick="window.setTarget('panelSetup')">Painel de Configurações</button>
+          <button class="setup-btn setup-btn-target" data-target="panelTrain" onclick="window.openTrainPanel()">Desenhos de Números</button>
+          <button class="setup-btn setup-btn-target" data-target="visor" onclick="window.setTarget('visor')">Peek Principal</button>
+          <button class="setup-btn setup-btn-target" data-target="footer" onclick="window.setTarget('footer')">Peek de Apoio</button>
+          <button class="setup-btn setup-btn-target" data-target="toolbar" onclick="window.setTarget('toolbar')">Barra de Ferramentas</button>
+          <button class="setup-btn setup-btn-target" data-target="panelCards" onclick="window.openCardsAdjust()">Painel de Cartas</button>
         </div>
-        <button class="action-btn" id="editTextBtn" onclick="window.editTargetText()">Editar Conteúdo do Peek 2</button>
-        <button class="action-btn" id="invertOrderBtn" style="display:none" onclick="window.toggleInvertOrder()">Ordem: 4H 05 → 05 4H</button>
       </div>
+
+      <div class="setup-group">
+        <label>Inputs</label>
+        <div class="setup-grid">
+          <button class="setup-btn" id="inputSwipeBtn" onclick="window.setInputType('swipe')">Swipes</button>
+          <button class="setup-btn" id="inputCardsBtn" onclick="window.setInputType('cards')">Cartas</button>
+        </div>
+      </div>
+
+      <div class="setup-group">
+        <label>Estilo dos Peeks</label>
+        <div class="setup-grid">
+          <button class="setup-btn" id="toggleEmojiBtn" onclick="window.toggleEmoji()">Símbolos de Naipes: OFF</button>
+          <button class="setup-btn" id="invertOrderBtn" onclick="window.toggleInvertOrder()">Ordem: 4H 05 → 05 4H</button>
+        </div>
+        <div style="margin-top: 15px;">
+          <label style="font-size: 11px; margin-bottom: 5px;">Preview do Peek</label>
+          <div id="peekPreview" style="text-align: center; font-size: 18px; font-weight: 600; padding: 10px; margin-bottom: 10px; background: rgba(0,0,0,0.05); border-radius: 8px; min-height: 30px;">3♥ 14</div>
+        </div>
+        <button class="action-btn" id="editTextBtn" style="display:none" onclick="window.editTargetText()">Alterar Texto do Peek de Apoio</button>
+      </div>
+
       <div class="setup-group">
         <label>Posição / Tamanho</label>
         <div class="control-grid">
@@ -131,24 +166,122 @@
           <button class="setup-btn" onclick="window.adjust('o', -0.1)">Clarear</button>
         </div>
       </div>
-      <button class="action-btn primary" onclick="window.toggleSetup()">Salvar e Sair</button>
+    </div>
+    <div class="panel-footer">
+      <button class="action-btn primary" onclick="window.toggleSetup()">Concluir e Salvar</button>
     </div>
   </section>
 
-  <!-- Painel de Treino -->
+  <!-- Painel de Treino (Desenhos de Números) -->
   <section id="trainPanel" class="hidden panel">
-    <div class="train-num" id="trainNumDisplay">1</div>
-    <div class="train-controls">
-      <button class="ctrl-btn" onclick="window.trainStep(-1)">←</button>
-      <button class="action-btn primary" onclick="window.trainSave()">Salvar Número</button>
-      <button class="ctrl-btn" onclick="window.trainStep(1)">→</button>
+    <div class="panel-header" style="display: flex; align-items: center; justify-content: center; gap: 10px; position: relative;">
+      <span>Desenhos de Números</span>
+      <button id="eyeBtnTrain" class="eye-button" aria-label="Ver o que está por baixo">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+      </button>
     </div>
-    <div class="setup-grid" style="margin-top:10px">
-      <button class="setup-btn" onclick="window.exportGlyphs()">Exportar</button>
-      <button class="setup-btn" onclick="document.getElementById('glyphInput').click()">Importar</button>
+    <div class="scroll-content">
+      <div class="train-num" id="trainNumDisplay">1</div>
+      <div class="train-controls">
+        <button class="ctrl-btn" onclick="window.trainStep(-1)">←</button>
+        <button class="action-btn primary" onclick="window.trainSave()">Salvar Número</button>
+        <button class="ctrl-btn" onclick="window.trainStep(1)">→</button>
+      </div>
+      
+      <div class="setup-group" style="margin-top: 20px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+          <label style="margin-bottom: 0;">Ajustes</label>
+          <div class="mode-selector" style="display: flex; gap: 5px;">
+            <button id="modeNumBtn" class="mini-btn active" onclick="window.setAdjustMode('number')">Ajustar Número</button>
+            <button id="modePanelBtn" class="mini-btn" onclick="window.setAdjustMode('panel')">Ajustar Painel</button>
+          </div>
+        </div>
+        <div class="control-grid">
+          <button class="ctrl-btn" onclick="window.handleAdjust('y', -5)">↑</button>
+          <button class="ctrl-btn" onclick="window.handleAdjust('x', -5)">←</button>
+          <button class="ctrl-btn" onclick="window.handleAdjust('x', 5)">→</button>
+          <button class="ctrl-btn" onclick="window.handleAdjust('y', 5)">↓</button>
+          <button class="ctrl-btn" onclick="window.handleAdjust('s', 5)">➕</button>
+          <button class="ctrl-btn" onclick="window.handleAdjust('s', -5)">➖</button>
+        </div>
+      </div>
+
+      <div class="setup-grid" style="margin-top:10px">
+        <button class="setup-btn" onclick="window.exportGlyphs()">Exportar</button>
+        <button class="setup-btn" onclick="document.getElementById('glyphInput').click()">Importar</button>
+      </div>
+      <input type="file" id="glyphInput" style="display:none" accept=".json" onchange="window.importGlyphs(event)">
     </div>
-    <input type="file" id="glyphInput" style="display:none" accept=".json" onchange="window.importGlyphs(event)">
-    <button class="action-btn" style="margin-top:10px" onclick="window.toggleTrain()">Sair</button>
+    <div class="panel-footer">
+      <button class="action-btn" onclick="window.toggleTrain()">Sair</button>
+    </div>
+  </section>
+
+  <!-- Painel de Cartas (Input Visual) -->
+  <section id="panelCards" class="hidden panel">
+    <div class="panel-header">Seletor de Cartas</div>
+    <div class="scroll-content">
+      <!-- Seção de Ajustes (Visível apenas no Modo Ajuste) -->
+      <div id="cardsAdjustControls" class="setup-group hidden" style="margin-bottom: 20px; border-bottom: 1px solid rgba(0,0,0,0.1); padding-bottom: 20px;">
+        <label>Ajustes de Posição e Tamanho</label>
+        <div class="control-grid">
+          <button class="ctrl-btn" onclick="window.adjust('y', -5)">↑</button>
+          <button class="ctrl-btn" onclick="window.adjust('x', -5)">←</button>
+          <button class="ctrl-btn" onclick="window.adjust('x', 5)">→</button>
+          <button class="ctrl-btn" onclick="window.adjust('y', 5)">↓</button>
+          <button class="ctrl-btn" onclick="window.adjust('s', 5)">➕</button>
+          <button class="ctrl-btn" onclick="window.adjust('s', -5)">➖</button>
+        </div>
+        <button class="action-btn primary" style="margin-top: 15px;" onclick="window.toggleCards()">Concluir e Salvar</button>
+      </div>
+
+      <div class="card-input-display" id="cardInputDisplay">--- --</div>
+      
+      <div class="setup-group">
+        <label>Valor</label>
+        <div class="card-grid values">
+          <button class="card-btn" data-rank="A" onclick="window.selectCardPart('rank', 'A')">A</button>
+          <button class="card-btn" data-rank="2" onclick="window.selectCardPart('rank', '2')">2</button>
+          <button class="card-btn" data-rank="3" onclick="window.selectCardPart('rank', '3')">3</button>
+          <button class="card-btn" data-rank="4" onclick="window.selectCardPart('rank', '4')">4</button>
+          <button class="card-btn" data-rank="5" onclick="window.selectCardPart('rank', '5')">5</button>
+          <button class="card-btn" data-rank="6" onclick="window.selectCardPart('rank', '6')">6</button>
+          <button class="card-btn" data-rank="7" onclick="window.selectCardPart('rank', '7')">7</button>
+          <button class="card-btn" data-rank="8" onclick="window.selectCardPart('rank', '8')">8</button>
+          <button class="card-btn" data-rank="9" onclick="window.selectCardPart('rank', '9')">9</button>
+          <button class="card-btn" data-rank="10" onclick="window.selectCardPart('rank', '10')">10</button>
+          <button class="card-btn" data-rank="J" onclick="window.selectCardPart('rank', 'J')">J</button>
+          <button class="card-btn" data-rank="Q" onclick="window.selectCardPart('rank', 'Q')">Q</button>
+          <button class="card-btn" data-rank="K" onclick="window.selectCardPart('rank', 'K')">K</button>
+        </div>
+      </div>
+
+      <div class="setup-group">
+        <label>Naipe</label>
+        <div class="card-grid suits">
+          <button class="card-btn" data-suit="S" onclick="window.selectCardPart('suit', 'S')">♠️</button>
+          <button class="card-btn" data-suit="H" onclick="window.selectCardPart('suit', 'H')">♥️</button>
+          <button class="card-btn" data-suit="C" onclick="window.selectCardPart('suit', 'C')">♣️</button>
+          <button class="card-btn" data-suit="D" onclick="window.selectCardPart('suit', 'D')">♦️</button>
+        </div>
+      </div>
+
+      <div class="setup-group">
+        <label>Número</label>
+        <div class="card-grid digits">
+          <button class="card-btn" data-digit="0" onclick="window.selectCardPart('digit', '0')">0</button>
+          <button class="card-btn" data-digit="1" onclick="window.selectCardPart('digit', '1')">1</button>
+          <button class="card-btn" data-digit="2" onclick="window.selectCardPart('digit', '2')">2</button>
+          <button class="card-btn" data-digit="3" onclick="window.selectCardPart('digit', '3')">3</button>
+          <button class="card-btn" data-digit="4" onclick="window.selectCardPart('digit', '4')">4</button>
+          <button class="card-btn" data-digit="5" onclick="window.selectCardPart('digit', '5')">5</button>
+          <button class="card-btn" data-digit="6" onclick="window.selectCardPart('digit', '6')">6</button>
+          <button class="card-btn" data-digit="7" onclick="window.selectCardPart('digit', '7')">7</button>
+          <button class="card-btn" data-digit="8" onclick="window.selectCardPart('digit', '8')">8</button>
+          <button class="card-btn" data-digit="9" onclick="window.selectCardPart('digit', '9')">9</button>
+        </div>
+      </div>
+    </div>
   </section>
 
   <!-- Toolbar iOS 26 -->
