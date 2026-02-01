@@ -85,11 +85,22 @@
   };
 
   const onResize = () => {
-    W = window.innerWidth; H = window.innerHeight; DPR = window.devicePixelRatio || 1;
-    board.width = W * DPR; board.height = H * DPR;
-    board.style.width = W + "px"; board.style.height = H + "px";
-    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-    applyCfg(); render(); checkOrientation();
+    // Pequeno delay para garantir que o navegador atualizou as dimensões reais (especialmente no iOS)
+    setTimeout(() => {
+      W = window.innerWidth; 
+      H = window.innerHeight; 
+      DPR = window.devicePixelRatio || 1;
+      
+      board.width = W * DPR; 
+      board.height = H * DPR;
+      board.style.width = W + "px"; 
+      board.style.height = H + "px";
+      
+      ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+      applyCfg(); 
+      render(); 
+      checkOrientation();
+    }, 100);
   };
 
   const getExamplePeek = () => {
