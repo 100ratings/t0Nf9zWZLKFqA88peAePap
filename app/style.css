@@ -105,13 +105,23 @@ html, body {
 }
 
 .swatch {
-  width: 30px;
-  height: 30px;
-  border-radius: 15px;
+  width: 32px;
+  height: 32px;
+  border-radius: 16px;
   border: 0;
   background: var(--c);
   transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
   position: relative;
+  cursor: pointer;
+}
+
+.swatch::after {
+  content: "";
+  position: absolute;
+  top: -10px;
+  left: -10px;
+  right: -10px;
+  bottom: -10px;
 }
 
 .swatch.active {

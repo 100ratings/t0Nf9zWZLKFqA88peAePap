@@ -267,8 +267,8 @@
 
   const formatCard = (card) => {
     const rank = card.slice(0, -1); const suit = card.slice(-1);
-    const emoji = {"S":"♠️","H":"♥️","C":"♣️","D":"♦️"}[suit] || suit;
-    return rank + emoji;
+    const suitDisplay = cfg.visor.useEmoji ? ({"S":"♠️","H":"♥️","C":"♣️","D":"♦️"}[suit] || suit) : suit;
+    return rank + suitDisplay;
   };
 
   const updateVisorProgress = () => {
@@ -604,7 +604,8 @@
     if (!blueBtn) return;
     let holdTimer = null;
     const startBluePeek = (e) => {
-      holdTimer = setTimeout(() => { blueBtn.dataset.isHolding = "true"; if (mode === "draw") { visor.style.opacity = cfg.visor.o; visorL1.textContent = lastResult || getExamplePeek(); } }, 200);
+      if (e.cancelable) e.preventDefault();
+      holdTimer = setTimeout(() => { blueBtn.dataset.isHolding = "true"; if (mode === "draw") { visor.style.opacity = cfg.visor.o; visorL1.textContent = lastResult || getExamplePeek(); } }, 150);
     };
     const stopBluePeek = (e) => {
       clearTimeout(holdTimer);
