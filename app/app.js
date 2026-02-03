@@ -19,6 +19,8 @@
   let currentStroke = null;
   let swipeData = { start: null, arrows: [] };
   let cardInputData = { rank: "", suit: "", digits: "" };
+  let tempTopCard = null; // Armazena a carta do topo temporária (botão amarelo)
+  let isYellowSwipe = false; // Indica se o swipe atual é do botão amarelo
   
   let tapCounts = { red: 0, yellow: 0 };
   let lastTapTimes = { red: 0, yellow: 0 };
@@ -26,6 +28,7 @@
   let trainNum = 1;
   let adjTarget = "visor";
   let lastResult = ""; 
+  let lastFooterResult = ""; 
   let adjustMode = "number";
   let isCardsAdjustMode = false;
   let peekTimer = null;
@@ -116,11 +119,25 @@
     if (mode === "setup" || mode === "train" || mode === "cards") {
       visor.style.opacity = cfg.visor.o;
       visorL1.textContent = lastResult || getExamplePeek();
+      visorL1.classList.remove("loading-dots-animation");
     } else if (mode === "draw") {
       visor.style.opacity = 0;
       visorL1.textContent = cfg.visor.text;
+      visorL1.classList.remove("loading-dots-animation");
+    } else if (mode === "swipe") {
+      visor.style.opacity = cfg.visor.o;
+      // Animação Inteligente: pontos aparecem apenas enquanto aguarda o comando (arrows.length === 0)
+      // E apenas se o swipe ainda não começou (swipeData.start === null)
+      if (swipeData.arrows.length === 0 && !swipeData.start) {
+        visorL1.textContent = "";
+        visorL1.classList.add("loading-dots-animation");
+      } else {
+        // Sumiço Automático: ao iniciar o swipe ou ter setas, a animação para
+        visorL1.classList.remove("loading-dots-animation");
+      }
     } else {
       visor.style.opacity = cfg.visor.o;
+      visorL1.classList.remove("loading-dots-animation");
     }
     
     footer.style.display = cfg.footer.visible ? "block" : "none";
@@ -128,7 +145,10 @@
     footer.style.top = (cfg.footer.y * H / 100) + "px";
     footer.style.fontSize = cfg.footer.s + "px";
     footer.style.opacity = cfg.footer.o;
-    if (mode !== "swipe") footer.textContent = cfg.footer.text;
+    
+    // Preservação Total: O footer (Peek de Apoio) SEMPRE mantém o último resultado se existir.
+    // Ele não deve sumir ou resetar para o texto padrão ao tocar no vermelho ou lixeira.
+    footer.textContent = lastFooterResult || cfg.footer.text;
 
     const panels = { "toolbar": "toolbar", "setupPanel": "panelSetup", "trainPanel": "panelTrain", "panelCards": "panelCards" };
     Object.keys(panels).forEach(id => {
@@ -145,6 +165,11 @@
 
     document.getElementById("toggleEmojiBtn").textContent = `Símbolos de Naipes: ${cfg.visor.useEmoji ? 'ON' : 'OFF'}`;
     document.getElementById("inputSwipeBtn").classList.toggle("active", cfg.inputType === "swipe");
+    document.getElementById("swatchGroup").querySelectorAll(".swatch").forEach(s => {
+      // O pontinho de cima (swipe-active) agora mostra a animação de carregamento (. .. ...)
+      if (s.dataset.color === "#FF3B30") s.classList.toggle("swipe-active", mode === "swipe" && !isYellowSwipe);
+      if (s.dataset.color === "#F7C600") s.classList.toggle("swipe-active", mode === "swipe" && isYellowSwipe);
+    });
     document.getElementById("inputCardsBtn").classList.toggle("active", cfg.inputType === "cards");
     document.getElementById("invertOrderBtn").textContent = cfg.visor.inverted ? "Ordem: 05 4H → 4H 05" : "Ordem: 4H 05 → 05 4H";
     document.getElementById("togglePeekStyleBtn").textContent = `Estilo: ${cfg.visor.peekStyle === 'cardOnly' ? 'Apenas Carta' : 'Carta + Posição'}`;
@@ -180,7 +205,33 @@
           if (cfg.inputType === "cards") window.toggleCards(false);
           else updateTap('red', 1, toggleSwipe);
         }
-        if (c === "#F7C600") updateTap('yellow', 5, toggleSetup);
+        if (c === "#111111") {
+          const key = 'black';
+          if (now - lastTapTimes[key] < 500) tapCounts[key]++;
+          else tapCounts[key] = 1;
+          lastTapTimes[key] = now;
+          if (tapCounts[key] >= 5) {
+            toggleSetup();
+            tapCounts[key] = 0;
+          }
+        }
+        if (c === "#F7C600") {
+          const key = 'yellow';
+          if (now - lastTapTimes[key] < 500) tapCounts[key]++;
+          else tapCounts[key] = 1;
+          lastTapTimes[key] = now;
+          
+          // Limpar qualquer timer de execução única se um novo toque vier rápido
+          if (window.yellowTapTimer) clearTimeout(window.yellowTapTimer);
+          
+          // Botão amarelo agora só para swipe (1 toque)
+          window.yellowTapTimer = setTimeout(() => {
+            if (tapCounts[key] === 1) {
+              toggleYellowSwipe();
+            }
+            tapCounts[key] = 0;
+          }, 300);
+        }
       };
     });
 
@@ -189,8 +240,10 @@
       e.stopPropagation(); 
       strokes = []; 
       swipeData.arrows = []; 
-      if (mode === "swipe") { mode = "draw"; visor.style.opacity = 0; }
+      if (mode === "swipe") { mode = "draw"; visor.style.opacity = 0; isYellowSwipe = false; }
       if (mode === "cards") window.toggleCards();
+      tempTopCard = null;
+      applyCfg();
       render(); 
     };
 
@@ -212,7 +265,12 @@
 
     if (e.target.closest("#toolbar") || e.target.closest(".panel") || e.target.closest("#activationScreen") || e.target.closest("#installScreen") || e.target.closest("#orientationWarning")) return;
     const p = getPt(e); e.preventDefault();
-    if (mode === "swipe") { swipeData.start = p; return; }
+    if (mode === "swipe") { 
+      swipeData.start = p; 
+      // Sumiço Automático: no exato momento em que inicia o movimento, a animação para
+      applyCfg();
+      return; 
+    }
     currentStroke = { c: mode === "train" ? "#111111" : color, p: [p] };
   };
 
@@ -237,7 +295,13 @@
     if (mode === "swipe" && swipeData.start) {
       const arrow = getArrow(swipeData.start, getPt(e));
       swipeData.start = null;
-      if (arrow) { swipeData.arrows.push(arrow); updateVisorProgress(); visor.style.opacity = cfg.visor.o; if (swipeData.arrows.length === 7) resolveSwipe(); }
+      if (arrow) { 
+        swipeData.arrows.push(arrow); 
+        updateVisorProgress(); 
+        visor.style.opacity = cfg.visor.o; 
+        const targetLen = isYellowSwipe ? 3 : 7;
+        if (swipeData.arrows.length === targetLen) resolveSwipe(); 
+      }
     }
     if (currentStroke) { strokes.push(currentStroke); currentStroke = null; render(); }
   };
@@ -277,7 +341,7 @@
       const rank = {"↑→":"A","→↑":"2","→→":"3","→↓":"4","↓→":"5","↓↓":"6","↓←":"7","←↓":"8","←←":"9","←↑":"10","↑←":"J","↑↑":"Q","↑↓":"K"}[arr[0]+arr[1]];
       const suit = {"↑":"S","→":"H","↓":"C","←":"D"}[arr[2]];
       const card = (rank && suit) ? formatCard(rank+suit) : "??";
-      if (len === 3) content = card;
+      if (len === 3) content = isYellowSwipe ? `TOPO: ${card}` : card;
       else if (len >= 5) {
         const dec = {"↑↑":0,"↑→":10,"→↑":20,"→→":"30","→↓":40,"↓→":50}[arr[3]+arr[4]];
         const decStr = dec !== undefined ? (dec/10).toString() : "?";
@@ -297,15 +361,25 @@
     const rank = {"↑→":"A","→↑":"2","→→":"3","→↓":"4","↓→":"5","↓↓":"6","↓←":"7","←↓":"8","←←":"9","←↑":"10","↑←":"J","↑↑":"Q","↑↓":"K"}[arr[0]+arr[1]];
     const suit = {"↑":"S","→":"H","↓":"C","←":"D"}[arr[2]];
     const card = (rank && suit) ? rank+suit : "";
-    const dec = {"↑↑":0,"↑→":10,"→↑":20,"→→":30,"→↓":40,"↓→":50}[arr[3]+arr[4]];
-    const unt = {"↑↑":0,"↑→":1,"→↑":2,"→→":3,"→↓":4,"↓→":5,"↓↓":6,"↓←":7,"←↓":8,"←←":"9"}[arr[5]+arr[6]];
-    const num = (dec !== undefined && unt !== undefined) ? parseInt(dec) + parseInt(unt) : 0;
-    processResult(card, num);
+    
+    if (isYellowSwipe) {
+      if (card) {
+        tempTopCard = card;
+        visorL1.textContent = `TOPO: ${formatCard(card)}`;
+      } else {
+        visorL1.textContent = "ERRO";
+      }
+    } else {
+      const dec = {"↑↑":0,"↑→":10,"→↑":20,"→→":30,"→↓":40,"↓→":50}[arr[3]+arr[4]];
+      const unt = {"↑↑":0,"↑→":1,"→↑":2,"→→":3,"→↓":4,"↓→":5,"↓↓":6,"↓←":7,"←↓":8,"←←":"9"}[arr[5]+arr[6]];
+      const num = (dec !== undefined && unt !== undefined) ? parseInt(dec) + parseInt(unt) : 0;
+      processResult(card, num);
+    }
     
     clearTimeout(peekTimer);
     peekTimer = setTimeout(() => { 
       if (mode !== "setup" && mode !== "cards" && mode !== "train") { visor.style.opacity = 0; setTimeout(() => { if (mode === "draw") visorL1.textContent = cfg.visor.text; }, 300); }
-      swipeData.arrows = []; if (mode === "swipe") mode = "draw"; 
+      swipeData.arrows = []; if (mode === "swipe") { mode = "draw"; isYellowSwipe = false; }
     }, cfg.peekDuration * 1000);
   };
 
@@ -313,19 +387,38 @@
     if (!card || num < 1 || num > 52) { visorL1.textContent = "ERRO"; lastResult = "ERRO"; }
     else {
       const pos = posMap[card]; const cut = ((pos - num % 52) + 52) % 52; const cutNum = (cut === 0 ? 52 : cut);
-      const cardStr = formatCard(STACK[cutNum-1]); const numStr = cutNum.toString().padStart(2, '0');
+      const cardResult = STACK[cutNum-1];
+      const cardStr = formatCard(cardResult); 
+      
+      // Cálculo da posição no topo temporário
+      let numStr = cutNum.toString().padStart(2, '0');
+      if (tempTopCard) {
+        const topPos = posMap[tempTopCard];
+        const newPos = ((posMap[cardResult] - topPos + 1) + 52) % 52;
+        const finalNewPos = (newPos === 0 ? 52 : newPos);
+        numStr = finalNewPos.toString().padStart(2, '0');
+        tempTopCard = null; // Reset automático após o cálculo
+      }
+      
       const peekResult = cfg.visor.peekStyle === "cardOnly" ? cardStr : (cfg.visor.inverted ? `${numStr} ${cardStr}` : `${cardStr} ${numStr}`);
       visorL1.textContent = peekResult; lastResult = peekResult;
       const ZZ_raw = cutNum.toString().padStart(2, '0'); const ZZ = ZZ_raw[0] + "." + ZZ_raw[1]; 
       const XX = pos.toString().padStart(2, '0'); const YY = num.toString().padStart(2, '0'); 
-      footer.textContent = `Sethi Draw v.1.0.2 (${ZZ}.${XX}${YY})`; stamp(num);
+      const footerResult = `Sethi Draw v.1.0.2 (${ZZ}.${XX}${YY})`;
+      footer.textContent = footerResult;
+      lastFooterResult = footerResult; // Armazena o resultado completo para preservação no footer
+      stamp(num);
     }
   };
 
   const stamp = (n) => {
     const numKey = parseInt(n); const g = JSON.parse(localStorage.getItem(`v6_g_${numKey}`) || "null");
-    const rx = cfg.number.x * W / 100, ry = cfg.number.y * H / 100;
-    const rw = cfg.number.s * W / 100, rh = cfg.number.h * H / 100;
+    
+    // Prioridade: Ajuste individual do número (g.cfg) ou ajuste global (cfg.number)
+    const nCfg = g?.cfg || cfg.number;
+    const rx = nCfg.x * W / 100, ry = nCfg.y * H / 100;
+    const rw = nCfg.s * W / 100, rh = nCfg.h * H / 100;
+    
     if (g?.s) g.s.forEach(s => strokes.push({ c: "#111111", p: s.p.map(p => ({ x: rx + p.x * rw, y: ry + p.y * rh })) }));
     else { ctx.save(); ctx.font = "bold 50px sans-serif"; ctx.fillText(n, rx + 20, ry + 60); ctx.restore(); }
     render();
@@ -337,9 +430,17 @@
   };
 
   const toggleSwipe = () => {
-    if (mode === "swipe") { mode = "draw"; visor.style.opacity = 0; }
-    else { closeOtherPanels(); mode = "swipe"; visor.style.opacity = cfg.visor.o; visorL1.textContent = "."; }
+    if (mode === "swipe") { mode = "draw"; visor.style.opacity = 0; isYellowSwipe = false; }
+    else { closeOtherPanels(); mode = "swipe"; visor.style.opacity = cfg.visor.o; visorL1.textContent = ""; isYellowSwipe = false; }
     swipeData.arrows = [];
+    applyCfg();
+  };
+
+  const toggleYellowSwipe = () => {
+    if (mode === "swipe" && isYellowSwipe) { mode = "draw"; visor.style.opacity = 0; isYellowSwipe = false; }
+    else { closeOtherPanels(); mode = "swipe"; visor.style.opacity = cfg.visor.o; visorL1.textContent = ""; isYellowSwipe = true; }
+    swipeData.arrows = [];
+    applyCfg();
   };
 
   window.toggleCards = (isAdjust = false) => {
@@ -357,7 +458,8 @@
 
   const closeOtherPanels = () => {
     setupPanel.classList.add("hidden"); trainPanel.classList.add("hidden"); cardsPanel.classList.add("hidden");
-    if (mode === "swipe") mode = "draw";
+    if (mode === "swipe") { mode = "draw"; isYellowSwipe = false; }
+    applyCfg();
   };
 
   window.selectCardPart = (type, val) => {
@@ -445,8 +547,14 @@
     if (!currentContainer) return;
 
     const targetKey = (mode === 'train' && adjustMode === 'number') ? 'number' : adjTarget;
-    const target = cfg[targetKey];
+    let target = cfg[targetKey];
     if (!target) return;
+
+    // Se estiver no modo treino ajustando o número, tenta pegar o ajuste individual
+    if (targetKey === 'number' && mode === 'train') {
+      const g = JSON.parse(localStorage.getItem(`v6_g_${trainNum}`) || "null");
+      if (g?.cfg) target = g.cfg;
+    }
 
     if (targetKey === 'number') {
       renderStepper(currentContainer, 'Posição X', 'x', targetKey, 1);
@@ -480,7 +588,15 @@
 
   window.adjust = (axis, val, targetKey = adjTarget, isSlider = false) => {
     if (mode === 'train' && adjustMode === 'number') targetKey = 'number';
-    const target = cfg[targetKey]; if (!target) return;
+    let target = cfg[targetKey]; if (!target) return;
+
+    // Se estiver no modo treino ajustando o número, usa/cria o ajuste individual
+    let isIndividual = false;
+    if (targetKey === 'number' && mode === 'train') {
+      const g = JSON.parse(localStorage.getItem(`v6_g_${trainNum}`) || "null");
+      target = g?.cfg || JSON.parse(JSON.stringify(cfg.number)); // Herda do global se não existir
+      isIndividual = true;
+    }
 
     if (isSlider) {
       target[axis] = val;
@@ -500,6 +616,15 @@
         else target.o = newVal;
       }
     }
+
+    if (isIndividual) {
+      const g = JSON.parse(localStorage.getItem(`v6_g_${trainNum}`) || JSON.stringify({ s: [] }));
+      g.cfg = target;
+      localStorage.setItem(`v6_g_${trainNum}`, JSON.stringify(g));
+    } else if (targetKey === 'number') {
+      cfg.number = target;
+    }
+
     applyCfg();
     updateAdjustUI();
     if (mode === "train") loadTrain(trainNum);
@@ -507,9 +632,17 @@
 
   window.adjustDirect = (axis, inputVal, targetKey = adjTarget) => {
     if (mode === 'train' && adjustMode === 'number') targetKey = 'number';
-    const target = cfg[targetKey]; if (!target) return;
+    let target = cfg[targetKey]; if (!target) return;
     const val = parseFloat(inputVal);
     if (isNaN(val)) return;
+
+    // Se estiver no modo treino ajustando o número, usa/cria o ajuste individual
+    let isIndividual = false;
+    if (targetKey === 'number' && mode === 'train') {
+      const g = JSON.parse(localStorage.getItem(`v6_g_${trainNum}`) || "null");
+      target = g?.cfg || JSON.parse(JSON.stringify(cfg.number)); // Herda do global se não existir
+      isIndividual = true;
+    }
 
     if (axis === "x" || axis === "y") {
       target[axis] = val;
@@ -533,6 +666,15 @@
         target.o = newVal;
       }
     }
+
+    if (isIndividual) {
+      const g = JSON.parse(localStorage.getItem(`v6_g_${trainNum}`) || JSON.stringify({ s: [] }));
+      g.cfg = target;
+      localStorage.setItem(`v6_g_${trainNum}`, JSON.stringify(g));
+    } else if (targetKey === 'number') {
+      cfg.number = target;
+    }
+
     applyCfg();
     updateAdjustUI();
     if (mode === "train") loadTrain(trainNum);
@@ -561,17 +703,28 @@
   const loadTrain = (n) => { 
     trainNum = Math.max(1, Math.min(52, n)); trainNumEl.textContent = trainNum; strokes = []; 
     const g = JSON.parse(localStorage.getItem(`v6_g_${trainNum}`) || "null");
-    const rx = cfg.number.x * W / 100, ry = cfg.number.y * H / 100;
-    const rw = cfg.number.s * W / 100, rh = cfg.number.h * H / 100;
+    
+    // Prioridade: Ajuste individual do número (g.cfg) ou ajuste global (cfg.number)
+    const nCfg = g?.cfg || cfg.number;
+    const rx = nCfg.x * W / 100, ry = nCfg.y * H / 100;
+    const rw = nCfg.s * W / 100, rh = nCfg.h * H / 100;
+    
     if (g?.s) g.s.forEach(s => strokes.push({ c: "#111111", p: s.p.map(p => ({ x: rx + p.x * rw, y: ry + p.y * rh })) }));
     render(); 
   };
   window.trainStep = (d) => loadTrain(trainNum + d);
   window.trainSave = () => {
-    const rx = cfg.number.x * W / 100, ry = cfg.number.y * H / 100;
-    const rw = cfg.number.s * W / 100, rh = cfg.number.h * H / 100;
+    const g = JSON.parse(localStorage.getItem(`v6_g_${trainNum}`) || "null");
+    const nCfg = g?.cfg || cfg.number;
+    const rx = nCfg.x * W / 100, ry = nCfg.y * H / 100;
+    const rw = nCfg.s * W / 100, rh = nCfg.h * H / 100;
     const s = strokes.map(st => ({ p: st.p.map(p => ({ x: (p.x - rx)/rw, y: (p.y - ry)/rh })) }));
-    if (s.length > 0) { localStorage.setItem(`v6_g_${trainNum}`, JSON.stringify({ s })); if (trainNum < 52) window.trainStep(1); else alert("Salvo!"); }
+    if (s.length > 0) { 
+      const newData = { s };
+      if (g?.cfg) newData.cfg = g.cfg; // Preserva o ajuste individual ao salvar o desenho
+      localStorage.setItem(`v6_g_${trainNum}`, JSON.stringify(newData)); 
+      if (trainNum < 52) window.trainStep(1); else alert("Salvo!"); 
+    }
   };
 
   window.exportGlyphs = () => {
