@@ -171,14 +171,14 @@ html, body {
 .panel.transparent-peek { opacity: 0.05 !important; transition: opacity 0.2s ease; pointer-events: none; }
 
 .panel-header { 
-  padding: 24px 24px 16px;
-  font-size: 19px; font-weight: 700; text-align: center;
+  padding: 16px 20px 12px;
+  font-size: 18px; font-weight: 700; text-align: center;
   border-bottom: 0.5px solid rgba(0,0,0,0.05);
   flex-shrink: 0;
 }
 
 .scroll-content {
-  padding: 16px 24px 24px;
+  padding: 12px 20px 20px;
   overflow-y: auto;
   flex-grow: 1;
   -webkit-overflow-scrolling: touch;
@@ -189,15 +189,15 @@ html, body {
 .scroll-content::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); border-radius: 10px; }
 
 .panel-footer {
-  padding: 16px 24px 24px;
+  padding: 12px 20px 20px;
   border-top: 0.5px solid rgba(0,0,0,0.05);
   flex-shrink: 0;
 }
 
-.setup-group { margin: 20px 0; }
-.setup-group label { display: block; font-size: 13px; font-weight: 600; color: #8e8e93; text-transform: uppercase; margin-bottom: 10px; }
+.setup-group { margin: 14px 0; }
+.setup-group label { display: block; font-size: 12px; font-weight: 600; color: #8e8e93; text-transform: uppercase; margin-bottom: 8px; }
 
-.setup-grid, .control-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+.setup-grid, .control-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
 .control-grid { grid-template-columns: repeat(3, 1fr); }
 
 .setup-btn, .ctrl-btn, .action-btn, .mini-btn, .card-btn {
@@ -234,6 +234,28 @@ html, body {
 }
 .eye-button svg { width: 28px; height: 28px; }
 .eye-button:active { color: var(--accent); transform: scale(0.9); }
+
+/* Botão de fechar modal (X) */
+.close-modal-btn {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  color: #8e8e93;
+  padding: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s ease, transform 0.1s ease;
+  border-radius: 50%;
+  cursor: pointer;
+}
+.close-modal-btn:active {
+  color: #ff3b30;
+  transform: translateY(-50%) scale(0.9);
+}
 
 /* ==================== TELA DE ATIVAÇÃO ==================== */
 #activationScreen {
@@ -274,3 +296,135 @@ html, body {
 .step-num { background: var(--accent); color: #fff; width: 24px; height: 24px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12px; }
 
 .hidden { display: none !important; }
+
+/* Novos Controles de Ajuste Compactos */
+.stepper-control {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  background: rgba(0, 0, 0, 0.04);
+  border-radius: 10px;
+  padding: 6px 10px;
+}
+
+.stepper-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #8e8e93;
+  text-transform: uppercase;
+  flex-grow: 1;
+}
+
+.stepper-value {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent);
+  min-width: 35px;
+  text-align: center;
+}
+
+.stepper-btn {
+  background: #fff;
+  border: 0.5px solid rgba(0,0,0,0.1);
+  color: #1c1c1e;
+  font-size: 16px;
+  font-weight: 700;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  transition: all 0.1s ease;
+}
+
+.stepper-btn:active {
+  background: #f2f2f7;
+  transform: scale(0.9);
+}
+
+.slider-control {
+  margin: 12px 0;
+  padding: 0 4px;
+}
+
+.slider-label-group {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.slider-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #8e8e93;
+  text-transform: uppercase;
+}
+
+.slider-value-display {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.range-slider {
+  width: 100%;
+  -webkit-appearance: none;
+  height: 4px;
+  background: #e5e5ea;
+  outline: none;
+  border-radius: 2px;
+}
+
+.range-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+  cursor: pointer;
+}
+
+/* Input numérico nos controles stepper */
+.stepper-input {
+  width: 50px;
+  height: 28px;
+  border: 0.5px solid rgba(0,0,0,0.1);
+  border-radius: 8px;
+  background: #fff;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent);
+  padding: 0 4px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  -webkit-appearance: none;
+  -moz-appearance: textfield;
+}
+
+.stepper-input::-webkit-inner-spin-button,
+.stepper-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.stepper-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.2);
+}
+
+.stepper-control {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+  background: rgba(0, 0, 0, 0.04);
+  border-radius: 10px;
+  padding: 6px 10px;
+}

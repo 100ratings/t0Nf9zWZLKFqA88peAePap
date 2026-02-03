@@ -109,6 +109,9 @@
   <!-- Painel de Setup (Secreto) -->
   <section id="setupPanel" class="hidden panel">
     <div class="panel-header" style="display: flex; align-items: center; justify-content: center; gap: 10px; position: relative;">
+      <button class="close-modal-btn" onclick="window.toggleSetup()" aria-label="Fechar">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
       <span>Configurações do App</span>
       <button id="eyeBtn" class="eye-button" aria-label="Ver o que está por baixo">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
@@ -139,6 +142,7 @@
         <label>Estilo dos Peeks</label>
         <div class="setup-grid">
           <button class="setup-btn" id="toggleEmojiBtn" onclick="window.toggleEmoji()">Símbolos de Naipes: OFF</button>
+          <button class="setup-btn" id="togglePeekStyleBtn" onclick="window.togglePeekStyle()">Estilo: Carta + Posição</button>
           <button class="setup-btn" id="invertOrderBtn" onclick="window.toggleInvertOrder()">Ordem: 4H 05 → 05 4H</button>
         </div>
         <div style="margin-top: 15px;">
@@ -149,32 +153,25 @@
       </div>
 
       <div class="setup-group">
-        <label>Posição / Tamanho</label>
-        <div class="control-grid">
-          <button class="ctrl-btn" onclick="window.adjust('y', -5)">↑</button>
-          <button class="ctrl-btn" onclick="window.adjust('x', -5)">←</button>
-          <button class="ctrl-btn" onclick="window.adjust('x', 5)">→</button>
-          <button class="ctrl-btn" onclick="window.adjust('y', 5)">↓</button>
-          <button class="ctrl-btn" onclick="window.adjust('s', 5)">➕</button>
-          <button class="ctrl-btn" onclick="window.adjust('s', -5)">➖</button>
+        <label>Ajustes de Posição / Tamanho</label>
+        <div id="setupAdjusts">
+          <!-- Gerado dinamicamente via JS -->
         </div>
       </div>
       <div class="setup-group" id="oControl" style="display:none">
-        <label>Opacidade</label>
-        <div class="setup-grid">
-          <button class="setup-btn" onclick="window.adjust('o', 0.1)">Escurecer</button>
-          <button class="setup-btn" onclick="window.adjust('o', -0.1)">Clarear</button>
+        <div id="opacitySlider">
+          <!-- Gerado dinamicamente via JS -->
         </div>
       </div>
-    </div>
-    <div class="panel-footer">
-      <button class="action-btn primary" onclick="window.toggleSetup()">Concluir e Salvar</button>
     </div>
   </section>
 
   <!-- Painel de Treino (Desenhos de Números) -->
   <section id="trainPanel" class="hidden panel">
     <div class="panel-header" style="display: flex; align-items: center; justify-content: center; gap: 10px; position: relative;">
+      <button class="close-modal-btn" onclick="window.toggleTrain()" aria-label="Fechar">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
       <span>Desenhos de Números</span>
       <button id="eyeBtnTrain" class="eye-button" aria-label="Ver o que está por baixo">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
@@ -196,13 +193,8 @@
             <button id="modePanelBtn" class="mini-btn" onclick="window.setAdjustMode('panel')">Ajustar Painel</button>
           </div>
         </div>
-        <div class="control-grid">
-          <button class="ctrl-btn" onclick="window.handleAdjust('y', -5)">↑</button>
-          <button class="ctrl-btn" onclick="window.handleAdjust('x', -5)">←</button>
-          <button class="ctrl-btn" onclick="window.handleAdjust('x', 5)">→</button>
-          <button class="ctrl-btn" onclick="window.handleAdjust('y', 5)">↓</button>
-          <button class="ctrl-btn" onclick="window.handleAdjust('s', 5)">➕</button>
-          <button class="ctrl-btn" onclick="window.handleAdjust('s', -5)">➖</button>
+        <div id="trainAdjusts">
+          <!-- Gerado dinamicamente via JS -->
         </div>
       </div>
 
@@ -212,27 +204,23 @@
       </div>
       <input type="file" id="glyphInput" style="display:none" accept=".json" onchange="window.importGlyphs(event)">
     </div>
-    <div class="panel-footer">
-      <button class="action-btn" onclick="window.toggleTrain()">Sair</button>
-    </div>
   </section>
 
   <!-- Painel de Cartas (Input Visual) -->
   <section id="panelCards" class="hidden panel">
-    <div class="panel-header">Seletor de Cartas</div>
+    <div class="panel-header" style="display: flex; align-items: center; justify-content: center; position: relative;">
+      <button class="close-modal-btn" onclick="window.toggleCards()" aria-label="Fechar">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
+      <span>Seletor de Cartas</span>
+    </div>
     <div class="scroll-content">
       <!-- Seção de Ajustes (Visível apenas no Modo Ajuste) -->
       <div id="cardsAdjustControls" class="setup-group hidden" style="margin-bottom: 20px; border-bottom: 1px solid rgba(0,0,0,0.1); padding-bottom: 20px;">
         <label>Ajustes de Posição e Tamanho</label>
-        <div class="control-grid">
-          <button class="ctrl-btn" onclick="window.adjust('y', -5)">↑</button>
-          <button class="ctrl-btn" onclick="window.adjust('x', -5)">←</button>
-          <button class="ctrl-btn" onclick="window.adjust('x', 5)">→</button>
-          <button class="ctrl-btn" onclick="window.adjust('y', 5)">↓</button>
-          <button class="ctrl-btn" onclick="window.adjust('s', 5)">➕</button>
-          <button class="ctrl-btn" onclick="window.adjust('s', -5)">➖</button>
+        <div id="cardsAdjusts">
+          <!-- Gerado dinamicamente via JS -->
         </div>
-        <button class="action-btn primary" style="margin-top: 15px;" onclick="window.toggleCards()">Concluir e Salvar</button>
       </div>
 
       <div class="card-input-display" id="cardInputDisplay">--- --</div>
@@ -267,9 +255,8 @@
       </div>
 
       <div class="setup-group">
-        <label>Número</label>
+        <label>Número (01-52)</label>
         <div class="card-grid digits">
-          <button class="card-btn" data-digit="0" onclick="window.selectCardPart('digit', '0')">0</button>
           <button class="card-btn" data-digit="1" onclick="window.selectCardPart('digit', '1')">1</button>
           <button class="card-btn" data-digit="2" onclick="window.selectCardPart('digit', '2')">2</button>
           <button class="card-btn" data-digit="3" onclick="window.selectCardPart('digit', '3')">3</button>
@@ -279,33 +266,41 @@
           <button class="card-btn" data-digit="7" onclick="window.selectCardPart('digit', '7')">7</button>
           <button class="card-btn" data-digit="8" onclick="window.selectCardPart('digit', '8')">8</button>
           <button class="card-btn" data-digit="9" onclick="window.selectCardPart('digit', '9')">9</button>
+          <button class="card-btn" data-digit="0" onclick="window.selectCardPart('digit', '0')">0</button>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- Toolbar iOS 26 -->
+  <!-- Toolbar iOS 26 - Floating Pill -->
   <div id="toolbar">
-    <button class="tool-item" id="undoBtn" aria-label="Undo">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"></path><path d="M20 20v-7a4 4 0 0 0-4-4H4"></path></svg>
+    <button class="tool-item" id="undoBtn" aria-label="Desfazer">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"></path><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path></svg>
     </button>
-    
-    <button class="tool-item" id="clearBtn" aria-label="Clear">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
+    <button class="tool-item" id="clearBtn" aria-label="Limpar">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
     </button>
-
     <div class="color-separator"></div>
-
     <div id="swatchGroup">
-      <button class="swatch active" data-color="#111111" style="--c:#111111"></button>
-      <button class="swatch" data-color="#F7C600" style="--c:#F7C600"></button>
-      <button class="swatch" data-color="#2FD36B" style="--c:#2FD36B"></button>
-      <button class="swatch" data-color="#FF3B30" style="--c:#FF3B30"></button>
-      <button class="swatch" data-color="#007AFF" style="--c:#007AFF"></button>
+      <button class="swatch active" data-color="#111111" style="--c: #111111"></button>
+      <button class="swatch" data-color="#F7C600" style="--c: #F7C600"></button>
+      <button class="swatch" data-color="#FF3B30" style="--c: #FF3B30"></button>
+      <button class="swatch" data-color="#007AFF" style="--c: #007AFF"></button>
     </div>
   </div>
 
   <script src="./activation-init.js"></script>
   <script src="./app.js?v=6.1.2"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').then(reg => {
+          console.log('SW registrado');
+        }).catch(err => {
+          console.log('Erro SW', err);
+        });
+      });
+    }
+  </script>
 </body>
 </html>

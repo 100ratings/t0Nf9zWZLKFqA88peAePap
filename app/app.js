@@ -10,7 +10,6 @@
   const trainNumEl = document.getElementById("trainNumDisplay");
   const cardInputDisplay = document.getElementById("cardInputDisplay");
   const cardsAdjustControls = document.getElementById("cardsAdjustControls");
-  const peekDurationDisplay = document.getElementById("peekDurationDisplay");
 
   let W = window.innerWidth, H = window.innerHeight, DPR = window.devicePixelRatio || 1;
 
@@ -47,6 +46,7 @@
   const ensureCfg = () => {
     Object.keys(cfg).forEach(k => { if (cfg[k] && typeof cfg[k] === 'object' && cfg[k].visible === undefined) cfg[k].visible = true; });
     if (cfg.visor.useEmoji === undefined) cfg.visor.useEmoji = false;
+    if (cfg.visor.peekStyle === undefined) cfg.visor.peekStyle = "both";
     if (cfg.visor.o === undefined) cfg.visor.o = 0.3;
     if (cfg.footer.o === undefined) cfg.footer.o = 0.3;
     if (cfg.inputType === undefined) cfg.inputType = "swipe";
@@ -61,6 +61,10 @@
     cfg.panelSetup.label = "Painel de Configurações";
     cfg.panelTrain.label = "Desenhos de Números";
     cfg.panelCards.label = "Painel de Cartas";
+    
+    // Sincronizar opacidade e tamanho entre visor e footer
+    if (cfg.visor.o !== cfg.footer.o) cfg.footer.o = cfg.visor.o;
+    if (cfg.visor.s !== cfg.footer.s) cfg.footer.s = cfg.visor.s;
   };
   ensureCfg();
 
@@ -76,6 +80,7 @@
     initBlueButtonPeek();
     checkOrientation();
     window.addEventListener('orientationchange', checkOrientation);
+    updateAdjustUI();
   };
 
   const checkOrientation = () => {
@@ -85,27 +90,19 @@
   };
 
   const onResize = () => {
-    // Pequeno delay para garantir que o navegador atualizou as dimensões reais (especialmente no iOS)
     setTimeout(() => {
-      W = window.innerWidth; 
-      H = window.innerHeight; 
-      DPR = window.devicePixelRatio || 1;
-      
-      board.width = W * DPR; 
-      board.height = H * DPR;
-      board.style.width = W + "px"; 
-      board.style.height = H + "px";
-      
+      W = window.innerWidth; H = window.innerHeight; DPR = window.devicePixelRatio || 1;
+      board.width = W * DPR; board.height = H * DPR;
+      board.style.width = W + "px"; board.style.height = H + "px";
       ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-      applyCfg(); 
-      render(); 
-      checkOrientation();
+      applyCfg(); render(); checkOrientation();
     }, 100);
   };
 
   const getExamplePeek = () => {
     const cardStr = cfg.visor.useEmoji ? "3♥️" : "3H";
     const numStr = "14";
+    if (cfg.visor.peekStyle === "cardOnly") return cardStr;
     return cfg.visor.inverted ? `${numStr} ${cardStr}` : `${cardStr} ${numStr}`;
   };
 
@@ -150,6 +147,7 @@
     document.getElementById("inputSwipeBtn").classList.toggle("active", cfg.inputType === "swipe");
     document.getElementById("inputCardsBtn").classList.toggle("active", cfg.inputType === "cards");
     document.getElementById("invertOrderBtn").textContent = cfg.visor.inverted ? "Ordem: 05 4H → 4H 05" : "Ordem: 4H 05 → 05 4H";
+    document.getElementById("togglePeekStyleBtn").textContent = `Estilo: ${cfg.visor.peekStyle === 'cardOnly' ? 'Apenas Carta' : 'Carta + Posição'}`;
     const peekPreview = document.getElementById("peekPreview");
     if (peekPreview) peekPreview.textContent = getExamplePeek();
 
@@ -187,35 +185,63 @@
     });
 
     document.getElementById("undoBtn").onclick = (e) => { e.stopPropagation(); strokes.pop(); render(); };
-    document.getElementById("clearBtn").onclick = (e) => { e.stopPropagation(); strokes = []; render(); };
+    document.getElementById("clearBtn").onclick = (e) => { 
+      e.stopPropagation(); 
+      strokes = []; 
+      swipeData.arrows = []; 
+      if (mode === "swipe") { mode = "draw"; visor.style.opacity = 0; }
+      if (mode === "cards") window.toggleCards();
+      render(); 
+    };
 
-    window.onpointerdown = (e) => {
-      if (e.target.closest("#toolbar") || e.target.closest(".panel") || e.target.closest("#activationScreen") || e.target.closest("#installScreen") || e.target.closest("#orientationWarning")) return;
-      const p = getPt(e); e.preventDefault();
-      if (mode === "swipe") { swipeData.start = p; return; }
-      if (mode === "train") {
-        // No modo treino, permitimos desenhar em qualquer lugar da tela que não seja o painel
-        // A restrição anterior impedia o desenho se o usuário começasse fora da caixa do número
+    let dragData = { active: false, startX: 0, startY: 0, initialX: 0, initialY: 0, axis: null, target: null };
+
+  window.onpointerdown = (e) => {
+    const stepperBtn = e.target.closest(".stepper-btn");
+    if (stepperBtn) {
+      const onclick = stepperBtn.getAttribute("onclick");
+      const match = onclick.match(/window\.adjust\('([^']*)', ([-.0-9]*), '([^']*)'\)/);
+      if (match) {
+        e.preventDefault();
+        const [_, axis, val, targetKey] = match;
+        dragData = { active: true, startX: e.clientX, startY: e.clientY, initialVal: cfg[targetKey][axis], axis, targetKey };
+        window.adjust(axis, parseFloat(val), targetKey);
+        return;
       }
-      currentStroke = { c: mode === "train" ? "#111111" : color, p: [p] };
-    };
+    }
 
-    window.onpointermove = (e) => {
-      if (!currentStroke) return;
-      const p = getPt(e); e.preventDefault();
-      currentStroke.p.push(p);
-      drawSeg(currentStroke.p[currentStroke.p.length-2], p, currentStroke.c);
-    };
-
-    window.onpointerup = (e) => {
-      if (mode === "swipe" && swipeData.start) {
-        const arrow = getArrow(swipeData.start, getPt(e));
-        swipeData.start = null;
-        if (arrow) { swipeData.arrows.push(arrow); updateVisorProgress(); visor.style.opacity = cfg.visor.o; if (swipeData.arrows.length === 7) resolveSwipe(); }
-      }
-      if (currentStroke) { strokes.push(currentStroke); currentStroke = null; render(); }
-    };
+    if (e.target.closest("#toolbar") || e.target.closest(".panel") || e.target.closest("#activationScreen") || e.target.closest("#installScreen") || e.target.closest("#orientationWarning")) return;
+    const p = getPt(e); e.preventDefault();
+    if (mode === "swipe") { swipeData.start = p; return; }
+    currentStroke = { c: mode === "train" ? "#111111" : color, p: [p] };
   };
+
+  window.onpointermove = (e) => {
+    if (dragData.active) {
+      const dx = e.clientX - dragData.startX;
+      const dy = e.clientY - dragData.startY;
+      const delta = Math.abs(dx) > Math.abs(dy) ? dx : -dy;
+      const sensitivity = (dragData.axis === 's' && (dragData.targetKey.startsWith('panel') || dragData.targetKey === 'toolbar')) || dragData.axis === 'o' ? 0.005 : 0.2;
+      const newVal = dragData.initialVal + delta * sensitivity;
+      window.adjustDirect(dragData.axis, newVal, dragData.targetKey);
+      return;
+    }
+    if (!currentStroke) return;
+    const p = getPt(e); e.preventDefault();
+    currentStroke.p.push(p);
+    drawSeg(currentStroke.p[currentStroke.p.length-2], p, currentStroke.c);
+  };
+
+  window.onpointerup = (e) => {
+    if (dragData.active) { dragData.active = false; return; }
+    if (mode === "swipe" && swipeData.start) {
+      const arrow = getArrow(swipeData.start, getPt(e));
+      swipeData.start = null;
+      if (arrow) { swipeData.arrows.push(arrow); updateVisorProgress(); visor.style.opacity = cfg.visor.o; if (swipeData.arrows.length === 7) resolveSwipe(); }
+    }
+    if (currentStroke) { strokes.push(currentStroke); currentStroke = null; render(); }
+  };
+};
 
   const getPt = (e) => { const r = board.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
   const drawSeg = (p1, p2, c) => {
@@ -240,8 +266,6 @@
   };
 
   const formatCard = (card) => {
-    if (!card) return "";
-    if (!cfg.visor.useEmoji) return card;
     const rank = card.slice(0, -1); const suit = card.slice(-1);
     const emoji = {"S":"♠️","H":"♥️","C":"♣️","D":"♦️"}[suit] || suit;
     return rank + emoji;
@@ -290,7 +314,7 @@
     else {
       const pos = posMap[card]; const cut = ((pos - num % 52) + 52) % 52; const cutNum = (cut === 0 ? 52 : cut);
       const cardStr = formatCard(STACK[cutNum-1]); const numStr = cutNum.toString().padStart(2, '0');
-      const peekResult = cfg.visor.inverted ? `${numStr} ${cardStr}` : `${cardStr} ${numStr}`;
+      const peekResult = cfg.visor.peekStyle === "cardOnly" ? cardStr : (cfg.visor.inverted ? `${numStr} ${cardStr}` : `${cardStr} ${numStr}`);
       visorL1.textContent = peekResult; lastResult = peekResult;
       const ZZ_raw = cutNum.toString().padStart(2, '0'); const ZZ = ZZ_raw[0] + "." + ZZ_raw[1]; 
       const XX = pos.toString().padStart(2, '0'); const YY = num.toString().padStart(2, '0'); 
@@ -309,7 +333,7 @@
 
   window.toggleSetup = () => {
     if (mode === "setup") { mode = "draw"; setupPanel.classList.add("hidden"); visor.style.opacity = 0; applyCfg(); }
-    else { closeOtherPanels(); mode = "setup"; setupPanel.classList.remove("hidden"); applyCfg(); }
+    else { closeOtherPanels(); mode = "setup"; setupPanel.classList.remove("hidden"); applyCfg(); updateAdjustUI(); }
   };
 
   const toggleSwipe = () => {
@@ -325,6 +349,7 @@
       isCardsAdjustMode = isAdjust;
       cardsAdjustControls.classList.toggle("hidden", !isAdjust);
       visor.style.opacity = cfg.visor.o; visorL1.textContent = lastResult || getExamplePeek(); resetCardInput(); 
+      if (isAdjust) updateAdjustUI();
     }
   };
 
@@ -366,33 +391,156 @@
     adjTarget = t;
     document.getElementById("oControl").style.display = (t === "visor" || t === "footer" || t.startsWith("panel")) ? "block" : "none";
     document.getElementById("editTextBtn").style.display = (t === "footer") ? "block" : "none";
+    updateAdjustUI();
     applyCfg();
   };
 
   window.setInputType = (type) => { cfg.inputType = type; applyCfg(); };
 
-  window.adjust = (axis, val) => {
-    const target = cfg[adjTarget]; if (!target) return;
-    const pctX = (val / W) * 100, pctY = (val / H) * 100;
-    if (axis === "x") target.x += pctX * 2;
-    if (axis === "y") target.y += pctY * 2;
-    if (axis === "s") {
-      if (adjTarget === "toolbar" || adjTarget.startsWith("panel")) target.s = Math.max(0.5, Math.min(2.0, target.s + val * 0.01));
-      else if (adjTarget === "number") { target.s += pctX * 2; target.h += pctY * 2; }
-      else if (adjTarget === "visor" || adjTarget === "footer") { cfg.visor.s += val * 0.5; cfg.footer.s = cfg.visor.s; }
-      else target.s += val * 0.5;
+  // Funções de Ajuste Aprimoradas
+  const renderStepper = (parent, label, axis, targetKey, step) => {
+    const val = cfg[targetKey][axis];
+    const displayVal = axis === 's' || axis === 'o' ? val.toFixed(2) : Math.round(val);
+    const inputId = `input_${targetKey}_${axis}_${Date.now()}`;
+    const html = `
+      <div class="stepper-control">
+        <span class="stepper-label">${label}</span>
+        <button class="stepper-btn" onclick="window.adjust('${axis}', -${step}, '${targetKey}')">-</button>
+        <input type="number" class="stepper-input" id="${inputId}" value="${displayVal}" 
+               onchange="window.adjustDirect('${axis}', this.value, '${targetKey}')" 
+               onclick="this.select()" step="${step}" />
+        <button class="stepper-btn" onclick="window.adjust('${axis}', ${step}, '${targetKey}')">+</button>
+      </div>
+    `;
+    parent.insertAdjacentHTML('beforeend', html);
+  };
+
+  const renderSlider = (parent, label, axis, targetKey, min, max, step) => {
+    const val = cfg[targetKey][axis];
+    const html = `
+      <div class="slider-control">
+        <div class="slider-label-group">
+          <span class="slider-label">${label}</span>
+          <span class="slider-value-display">${val.toFixed(2)}</span>
+        </div>
+        <input type="range" min="${min}" max="${max}" step="${step}" value="${val}" class="range-slider" 
+               oninput="window.adjust('${axis}', parseFloat(this.value), '${targetKey}', true)">
+      </div>
+    `;
+    parent.insertAdjacentHTML('beforeend', html);
+  };
+
+  window.updateAdjustUI = () => {
+    const setupContainer = document.getElementById("setupAdjusts");
+    const trainContainer = document.getElementById("trainAdjusts");
+    const cardsContainer = document.getElementById("cardsAdjusts");
+    const opacityContainer = document.getElementById("opacitySlider");
+
+    if (setupContainer) setupContainer.innerHTML = "";
+    if (trainContainer) trainContainer.innerHTML = "";
+    if (cardsContainer) cardsContainer.innerHTML = "";
+    if (opacityContainer) opacityContainer.innerHTML = "";
+
+    const currentContainer = mode === 'setup' ? setupContainer : (mode === 'train' ? trainContainer : cardsContainer);
+    if (!currentContainer) return;
+
+    const targetKey = (mode === 'train' && adjustMode === 'number') ? 'number' : adjTarget;
+    const target = cfg[targetKey];
+    if (!target) return;
+
+    if (targetKey === 'number') {
+      renderStepper(currentContainer, 'Posição X', 'x', targetKey, 1);
+      renderStepper(currentContainer, 'Posição Y', 'y', targetKey, 1);
+      renderStepper(currentContainer, 'Largura', 's', targetKey, 1);
+      renderStepper(currentContainer, 'Altura', 'h', targetKey, 1);
+    } else {
+      renderStepper(currentContainer, 'Posição X', 'x', targetKey, 1);
+      renderStepper(currentContainer, 'Posição Y', 'y', targetKey, 1);
+      const sStep = targetKey.startsWith('panel') || targetKey === 'toolbar' ? 0.05 : 1;
+      renderStepper(currentContainer, targetKey.startsWith('panel') ? 'Escala' : 'Tamanho', 's', targetKey, sStep);
     }
-    if (axis === "o") {
-      const newVal = Math.max(0.05, Math.min(1.0, (target.o || 0.5) + val));
-      if (adjTarget === "visor" || adjTarget === "footer") { cfg.visor.o = newVal; cfg.footer.o = newVal; }
-      else target.o = newVal;
+
+    if (opacityContainer && (adjTarget === 'visor' || adjTarget === 'footer' || adjTarget.startsWith('panel'))) {
+      const val = cfg[adjTarget].o || 0.5;
+      const displayVal = Math.round(val * 100);
+      const inputId = `input_opacity_${Date.now()}`;
+      const html = `
+        <div class="stepper-control">
+          <span class="stepper-label">Opacidade (%)</span>
+          <button class="stepper-btn" onclick="window.adjust('o', -0.05, '${adjTarget}')">-</button>
+          <input type="number" class="stepper-input" id="${inputId}" value="${displayVal}" min="5" max="100" step="1"
+                 onchange="window.adjustDirect('o', parseFloat(this.value) / 100, '${adjTarget}')" 
+                 onclick="this.select()" />
+          <button class="stepper-btn" onclick="window.adjust('o', 0.05, '${adjTarget}')">+</button>
+        </div>
+      `;
+      opacityContainer.innerHTML = html;
+    }
+  };
+
+  window.adjust = (axis, val, targetKey = adjTarget, isSlider = false) => {
+    if (mode === 'train' && adjustMode === 'number') targetKey = 'number';
+    const target = cfg[targetKey]; if (!target) return;
+
+    if (isSlider) {
+      target[axis] = val;
+    } else {
+      if (axis === "x") target.x += val;
+      else if (axis === "y") target.y += val;
+      else if (axis === "s") {
+        if (targetKey === "toolbar" || targetKey.startsWith("panel")) target.s = Math.max(0.5, Math.min(2.0, target.s + val));
+        else if (targetKey === "number") { target.s += val; }
+        else if (targetKey === "visor" || targetKey === "footer") { cfg.visor.s = Math.max(5, cfg.visor.s + val); cfg.footer.s = cfg.visor.s; }
+        else target.s += val;
+      }
+      else if (axis === "h" && targetKey === "number") { target.h += val; }
+      else if (axis === "o") {
+        const newVal = Math.max(0.05, Math.min(1.0, (target.o || 0.5) + val));
+        if (targetKey === "visor" || targetKey === "footer") { cfg.visor.o = newVal; cfg.footer.o = newVal; }
+        else target.o = newVal;
+      }
     }
     applyCfg();
+    updateAdjustUI();
+    if (mode === "train") loadTrain(trainNum);
+  };
+
+  window.adjustDirect = (axis, inputVal, targetKey = adjTarget) => {
+    if (mode === 'train' && adjustMode === 'number') targetKey = 'number';
+    const target = cfg[targetKey]; if (!target) return;
+    const val = parseFloat(inputVal);
+    if (isNaN(val)) return;
+
+    if (axis === "x" || axis === "y") {
+      target[axis] = val;
+    } else if (axis === "s") {
+      if (targetKey === "toolbar" || targetKey.startsWith("panel")) {
+        target.s = Math.max(0.5, Math.min(2.0, val));
+      } else if (targetKey === "visor" || targetKey === "footer") {
+        cfg.visor.s = Math.max(5, val);
+        cfg.footer.s = cfg.visor.s;
+      } else {
+        target.s = val;
+      }
+    } else if (axis === "h" && targetKey === "number") {
+      target.h = val;
+    } else if (axis === "o") {
+      const newVal = Math.max(0.05, Math.min(1.0, val));
+      if (targetKey === "visor" || targetKey === "footer") {
+        cfg.visor.o = newVal;
+        cfg.footer.o = newVal;
+      } else {
+        target.o = newVal;
+      }
+    }
+    applyCfg();
+    updateAdjustUI();
+    if (mode === "train") loadTrain(trainNum);
   };
 
   window.toggleEmoji = () => { cfg.visor.useEmoji = !cfg.visor.useEmoji; applyCfg(); };
+  window.togglePeekStyle = () => { cfg.visor.peekStyle = cfg.visor.peekStyle === "both" ? "cardOnly" : "both"; applyCfg(); };
   window.toggleInvertOrder = () => { cfg.visor.inverted = !cfg.visor.inverted; applyCfg(); };
-  // Duração fixada em 1.0s conforme solicitado
   cfg.peekDuration = 1.0;
 
   window.editTargetText = () => {
@@ -401,24 +549,13 @@
     if (n !== null) { target.text = n; applyCfg(); }
   };
 
-  window.openTrainPanel = () => { window.setTarget('panelTrain'); closeOtherPanels(); mode = "train"; trainPanel.classList.remove("hidden"); loadTrain(trainNum || 1); applyCfg(); };
-  window.toggleTrain = () => { 
-    mode = "draw"; 
-    trainPanel.classList.add("hidden"); 
-    applyCfg(); 
-    render(); 
-  };
+  window.openTrainPanel = () => { window.setTarget('panelTrain'); closeOtherPanels(); mode = "train"; trainPanel.classList.remove("hidden"); loadTrain(trainNum || 1); updateAdjustUI(); applyCfg(); };
+  window.toggleTrain = () => { mode = "draw"; trainPanel.classList.add("hidden"); applyCfg(); render(); };
   window.setAdjustMode = (m) => {
     adjustMode = m;
     document.getElementById("modeNumBtn").classList.toggle("active", m === 'number');
     document.getElementById("modePanelBtn").classList.toggle("active", m === 'panel');
-  };
-  window.handleAdjust = (axis, val) => { if (adjustMode === 'number') window.adjustNumber(axis, val); else { adjTarget = "panelTrain"; window.adjust(axis, val); } };
-  window.adjustNumber = (axis, val) => {
-    const target = cfg.number; const pctX = (val / W) * 100, pctY = (val / H) * 100;
-    if (axis === "x") target.x += pctX * 2; if (axis === "y") target.y += pctY * 2;
-    if (axis === "s") { target.s += pctX * 2; target.h += pctY * 2; }
-    applyCfg(); if (mode === "train") loadTrain(trainNum);
+    updateAdjustUI();
   };
 
   const loadTrain = (n) => { 
