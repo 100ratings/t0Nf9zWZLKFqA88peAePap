@@ -372,6 +372,12 @@
           isYellowSwipe = false;
           swipeData.arrows = [];
           visorL1.textContent = "";
+          
+          color = "#FF3B30";
+          document.querySelectorAll(".swatch").forEach(s => {
+            s.classList.toggle("active", s.dataset.color === "#FF3B30");
+          });
+          
           applyCfg();
         }, 1000);
         return;
