@@ -366,6 +366,15 @@
       if (card) {
         tempTopCard = card;
         visorL1.textContent = `TOPO: ${formatCard(card)}`;
+        
+        clearTimeout(peekTimer);
+        peekTimer = setTimeout(() => {
+          isYellowSwipe = false;
+          swipeData.arrows = [];
+          visorL1.textContent = "";
+          applyCfg();
+        }, 1000);
+        return;
       } else {
         visorL1.textContent = "ERRO";
       }
