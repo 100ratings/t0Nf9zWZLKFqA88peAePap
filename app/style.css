@@ -177,8 +177,14 @@ html, body {
   margin-bottom: 0 !important;
   bottom: auto !important; /* Garante que o TOP controle a posição */
   /* Bala de Prata: Aceleração de Hardware para evitar cortes na renderização */
-  transform: translateX(-50%) translateZ(0) !important;
-  -webkit-transform: translateX(-50%) translateZ(0) !important;
+
+  --footer-safe-y: 0px;
+  transform: translateX(-50%) translateY(var(--footer-safe-y)) translateZ(0) !important;
+  -webkit-transform: translateX(-50%) translateY(var(--footer-safe-y)) translateZ(0) !important;
+}
+
+.footer-container.invade-safe-area {
+  --footer-safe-y: calc(env(safe-area-inset-bottom) * 0.7);
 }
 
 /* Painéis (Setup e Treino) */

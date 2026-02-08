@@ -191,6 +191,7 @@
     footer.style.bottom = "auto"; // Garante que nada force ele para cima
     footer.style.pointerEvents = "none"; // Bala de Prata: Garante que o toque passe direto (Ghost Element)
     footer.style.opacity = cfg.footer.o;
+    footer.classList.add("invade-safe-area");
     
     // Preservação Total: O footer (Peek de Apoio) SEMPRE mantém o último resultado se existir.
     // Ele não deve sumir ou resetar para o texto padrão ao tocar no vermelho ou lixeira.
