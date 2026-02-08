@@ -17,6 +17,8 @@
   let color = "#111111";
   let strokes = [];
   let currentStroke = null;
+  let drawPointerId = null;
+  let eyePointerId = null;
   let swipeData = { start: null, arrows: [] };
   let cardInputData = { rank: "", suit: "", digits: "" };
   let tempTopCard = null; // Armazena a carta do topo temporária (botão amarelo)
@@ -32,16 +34,18 @@
   let adjustMode = "number";
   let isCardsAdjustMode = false;
   let peekTimer = null;
+  let floatingEyeBtn = null;
+  let minimizedPanelId = null;
 
   let cfg = JSON.parse(localStorage.getItem("mnem_v6_cfg") || JSON.stringify({
-    visor: { x: 50, y: 80, s: 15, lh: 1.1, y2: 0, text: "…", label: "Peek Principal", inverted: false, useEmoji: false, o: 0.3 },
+    visor: { x: 50, y: 70, s: 15, lh: 1.1, y2: 0, text: "…", label: "Peek Principal", inverted: false, useEmoji: false, o: 0.3 },
     number: { x: 12.5, y: 34, s: 75, h: 41, label: "Número" },
-    footer: { x: 50, y: 90, s: 10, o: 0.3, text: "Sethi Draw v.1.0.2 (1.4.2814)", label: "Peek de Apoio" },
+    footer: { x: 50, y: 80, s: 10, o: 0.3, text: "Sethi Draw v.1.0.2 (1.4.2815)", label: "Peek de Apoio" },
     peek: { x: 50, y: 82, s: 15, text: "", label: "Peek" },
-    toolbar: { x: 50, y: 50, s: 1, label: "Barra de Ferramentas" },
-    panelSetup: { x: 50, y: 30, s: 1, o: 0.6, label: "Painel de Configurações" },
-    panelTrain: { x: 50, y: 30, s: 1, o: 0.6, label: "Desenhos de Números" },
-    panelCards: { x: 50, y: 30, s: 1, o: 0.6, label: "Painel de Cartas" },
+    toolbar: { x: 50, y: 92, s: 1, label: "Barra de Ferramentas" },
+    panelSetup: { x: 50, y: 10, s: 1, o: 0.6, label: "Painel de Configurações" },
+    panelTrain: { x: 50, y: 10, s: 1, o: 0.6, label: "Desenhos de Números" },
+    panelCards: { x: 50, y: 10, s: 1, o: 0.6, label: "Painel de Cartas" },
     inputType: "swipe",
     peekDuration: 1.0
   }));
@@ -54,9 +58,9 @@
     if (cfg.footer.o === undefined) cfg.footer.o = 0.3;
     if (cfg.inputType === undefined) cfg.inputType = "swipe";
     cfg.peekDuration = 1.0;
-    if (!cfg.panelSetup) cfg.panelSetup = { x: 50, y: 30, s: 1, o: 0.6, label: "Painel de Configurações" };
-    if (!cfg.panelTrain) cfg.panelTrain = { x: 50, y: 30, s: 1, o: 0.6, label: "Desenhos de Números" };
-    if (!cfg.panelCards) cfg.panelCards = { x: 50, y: 30, s: 1, o: 0.6, label: "Painel de Cartas" };
+    if (!cfg.panelSetup) cfg.panelSetup = { x: 50, y: 10, s: 1, o: 0.6, label: "Painel de Configurações" };
+    if (!cfg.panelTrain) cfg.panelTrain = { x: 50, y: 10, s: 1, o: 0.6, label: "Desenhos de Números" };
+    if (!cfg.panelCards) cfg.panelCards = { x: 50, y: 10, s: 1, o: 0.6, label: "Painel de Cartas" };
     
     cfg.visor.label = "Peek Principal";
     cfg.footer.label = "Peek de Apoio";
@@ -68,6 +72,12 @@
     // Sincronizar opacidade e tamanho entre visor e footer
     if (cfg.visor.o !== cfg.footer.o) cfg.footer.o = cfg.visor.o;
     if (cfg.visor.s !== cfg.footer.s) cfg.footer.s = cfg.visor.s;
+
+    // Migração automática para novos defaults (Topo/Fundo) se estiverem nos valores antigos
+    if (cfg.panelSetup && cfg.panelSetup.y === 30) cfg.panelSetup.y = 10;
+    if (cfg.panelTrain && cfg.panelTrain.y === 30) cfg.panelTrain.y = 10;
+    if (cfg.panelCards && cfg.panelCards.y === 30) cfg.panelCards.y = 10;
+    if (cfg.toolbar && cfg.toolbar.y === 50) cfg.toolbar.y = 92;
   };
   ensureCfg();
 
@@ -76,13 +86,45 @@
 
   const init = () => {
     window.addEventListener('resize', onResize);
-    onResize();
+    updateLayout();
     bindEvents();
+    createFloatingEyeBtn();
+    
+    // Remover Preview do Peek (Legacy)
+    const peekPreview = document.getElementById("peekPreview");
+    if (peekPreview) {
+      peekPreview.style.display = "none";
+      const label = peekPreview.previousElementSibling;
+      if (label && label.tagName === "LABEL") label.style.display = "none";
+    }
+    
+    // Injetar botão de olho no Painel de Cartas se não existir
+    const cardsHeader = cardsPanel?.querySelector(".panel-header");
+    if (cardsHeader && !document.getElementById("eyeBtnCards")) {
+      cardsHeader.style.position = "relative";
+      const btn = document.createElement("button");
+      btn.id = "eyeBtnCards";
+      btn.className = "eye-button";
+      btn.style.position = "absolute";
+      btn.style.right = "16px"; btn.style.top = "50%"; btn.style.transform = "translateY(-50%)";
+      btn.innerHTML = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>`;
+      cardsHeader.appendChild(btn);
+    }
+
     initEyeButton("eyeBtn", "setupPanel");
     initEyeButton("eyeBtnTrain", "trainPanel");
+    initEyeButton("eyeBtnCards", "panelCards");
     initBlueButtonPeek();
     checkOrientation();
     window.addEventListener('orientationchange', checkOrientation);
+
+    // Trocar ordem visual dos botões de modo no painel de treino (Painel <-> Número)
+    const btnNum = document.getElementById("modeNumBtn");
+    const btnPanel = document.getElementById("modePanelBtn");
+    if (btnNum && btnPanel && btnNum.parentNode) {
+      btnNum.parentNode.insertBefore(btnPanel, btnNum);
+    }
+
     updateAdjustUI();
   };
 
@@ -92,14 +134,16 @@
     else { warning.classList.add("hidden"); }
   };
 
+  const updateLayout = () => {
+    W = window.innerWidth; H = window.innerHeight; DPR = window.devicePixelRatio || 1;
+    board.width = W * DPR; board.height = H * DPR;
+    board.style.width = W + "px"; board.style.height = H + "px";
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    applyCfg(); render(); checkOrientation();
+  };
+
   const onResize = () => {
-    setTimeout(() => {
-      W = window.innerWidth; H = window.innerHeight; DPR = window.devicePixelRatio || 1;
-      board.width = W * DPR; board.height = H * DPR;
-      board.style.width = W + "px"; board.style.height = H + "px";
-      ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-      applyCfg(); render(); checkOrientation();
-    }, 100);
+    setTimeout(updateLayout, 100);
   };
 
   const getExamplePeek = () => {
@@ -144,6 +188,8 @@
     footer.style.left = (cfg.footer.x * W / 100) + "px";
     footer.style.top = (cfg.footer.y * H / 100) + "px";
     footer.style.fontSize = cfg.footer.s + "px";
+    footer.style.bottom = "auto"; // Garante que nada force ele para cima
+    footer.style.pointerEvents = "none"; // Bala de Prata: Garante que o toque passe direto (Ghost Element)
     footer.style.opacity = cfg.footer.o;
     
     // Preservação Total: O footer (Peek de Apoio) SEMPRE mantém o último resultado se existir.
@@ -173,8 +219,6 @@
     document.getElementById("inputCardsBtn").classList.toggle("active", cfg.inputType === "cards");
     document.getElementById("invertOrderBtn").textContent = cfg.visor.inverted ? "Ordem: 05 4H → 4H 05" : "Ordem: 4H 05 → 05 4H";
     document.getElementById("togglePeekStyleBtn").textContent = `Estilo: ${cfg.visor.peekStyle === 'cardOnly' ? 'Apenas Carta' : 'Carta + Posição'}`;
-    const peekPreview = document.getElementById("peekPreview");
-    if (peekPreview) peekPreview.textContent = getExamplePeek();
 
     document.querySelectorAll(".setup-btn-target").forEach(btn => {
       btn.classList.toggle("active", btn.dataset.target === adjTarget);
@@ -185,6 +229,18 @@
 
   const bindEvents = () => {
     document.querySelectorAll(".swatch").forEach(s => {
+      // Lógica de segurar para o botão preto (Setup) - 3 segundos
+      if (s.dataset.color === "#111111") {
+        let blackTimer = null;
+        s.addEventListener("pointerdown", (e) => {
+          blackTimer = setTimeout(() => window.toggleSetup(), 1500);
+        });
+        const clearBlack = () => clearTimeout(blackTimer);
+        s.addEventListener("pointerup", clearBlack);
+        s.addEventListener("pointercancel", clearBlack);
+        s.addEventListener("pointerleave", clearBlack);
+      }
+
       s.onclick = (e) => {
         if (s.dataset.color === "#007AFF" && s.dataset.isHolding === "true") return;
         e.stopPropagation();
@@ -205,35 +261,26 @@
           if (cfg.inputType === "cards") window.toggleCards(false);
           else updateTap('red', 1, toggleSwipe);
         }
-        if (c === "#111111") {
-          const key = 'black';
-          if (now - lastTapTimes[key] < 500) tapCounts[key]++;
-          else tapCounts[key] = 1;
-          lastTapTimes[key] = now;
-          if (tapCounts[key] >= 5) {
-            toggleSetup();
-            tapCounts[key] = 0;
-          }
-        }
         if (c === "#F7C600") {
-          const key = 'yellow';
-          if (now - lastTapTimes[key] < 500) tapCounts[key]++;
-          else tapCounts[key] = 1;
-          lastTapTimes[key] = now;
-          
-          // Limpar qualquer timer de execução única se um novo toque vier rápido
-          if (window.yellowTapTimer) clearTimeout(window.yellowTapTimer);
-          
-          // Botão amarelo agora só para swipe (1 toque)
-          window.yellowTapTimer = setTimeout(() => {
-            if (tapCounts[key] === 1) {
-              toggleYellowSwipe();
-            }
-            tapCounts[key] = 0;
-          }, 300);
+          updateTap('yellow', 1, toggleYellowSwipe);
         }
       };
     });
+
+    // Failsafe global: Limpar estados ao clicar em botões de controle críticos
+    const resetInteractionState = () => {
+      drawPointerId = null;
+      eyePointerId = null;
+      currentStroke = null;
+      document.querySelectorAll(".panel").forEach(p => p.classList.remove("transparent-peek"));
+      try { board.releasePointerCapture(); } catch(e){}
+      // Só esconde o botão flutuante se NÃO estivermos em modo minimizado
+      if (floatingEyeBtn && !minimizedPanelId) floatingEyeBtn.style.display = "none";
+    };
+    
+    // Failsafes de emergência para evitar travamento total (iOS/Multitouch)
+    window.addEventListener("blur", resetInteractionState);
+    window.addEventListener("visibilitychange", resetInteractionState);
 
     document.getElementById("undoBtn").onclick = (e) => { e.stopPropagation(); strokes.pop(); render(); };
     document.getElementById("clearBtn").onclick = (e) => { 
@@ -243,6 +290,7 @@
       if (mode === "swipe") { mode = "draw"; visor.style.opacity = 0; isYellowSwipe = false; }
       if (mode === "cards") window.toggleCards();
       tempTopCard = null;
+      resetInteractionState();
       applyCfg();
       render(); 
     };
@@ -250,21 +298,53 @@
     let dragData = { active: false, startX: 0, startY: 0, initialX: 0, initialY: 0, axis: null, target: null };
 
   window.onpointerdown = (e) => {
-    const stepperBtn = e.target.closest(".stepper-btn");
-    if (stepperBtn) {
-      const onclick = stepperBtn.getAttribute("onclick");
-      const match = onclick.match(/window\.adjust\('([^']*)', ([-.0-9]*), '([^']*)'\)/);
-      if (match) {
-        e.preventDefault();
-        const [_, axis, val, targetKey] = match;
-        dragData = { active: true, startX: e.clientX, startY: e.clientY, initialVal: cfg[targetKey][axis], axis, targetKey };
-        window.adjust(axis, parseFloat(val), targetKey);
-        return;
+    // 1. Interações de UI (Botões, Toolbar, Telas de bloqueio)
+    // Se for um elemento interativo, deixamos o evento passar e não desenhamos
+    if (e.target.closest(".stepper-btn") || 
+        e.target.closest(".swatch") || 
+        e.target.closest("button") || 
+        e.target.closest("input") ||
+        e.target.closest("#toolbar") || 
+        e.target.closest("#activationScreen") || 
+        e.target.closest("#installScreen") || 
+        e.target.closest("#orientationWarning") ||
+        e.target.closest("#floatingEyeBtn")) {
+      
+      // Lógica específica para os botões de ajuste (stepper) que usam drag
+      const stepperBtn = e.target.closest(".stepper-btn");
+      if (stepperBtn) {
+        const onclick = stepperBtn.getAttribute("onclick");
+        const match = onclick && onclick.match(/window\.adjust\('([^']*)', ([-.0-9]*), '([^']*)'\)/);
+        if (match) {
+          e.preventDefault();
+          if (drawPointerId !== null) return;
+          if (eyePointerId !== null && e.pointerId === eyePointerId) return;
+          drawPointerId = e.pointerId;
+          const [_, axis, val, targetKey] = match;
+          dragData = { active: true, startX: e.clientX, startY: e.clientY, initialVal: cfg[targetKey][axis], axis, targetKey };
+          window.adjust(axis, parseFloat(val), targetKey);
+        }
       }
+      return;
     }
 
-    if (e.target.closest("#toolbar") || e.target.closest(".panel") || e.target.closest("#activationScreen") || e.target.closest("#installScreen") || e.target.closest("#orientationWarning")) return;
-    const p = getPt(e); e.preventDefault();
+    // 2. Lógica do Painel (Setup/Treino/Cartas)
+    const panel = e.target.closest(".panel");
+    // Se tocou no painel e ele NÃO está transparente, bloqueia o desenho (é interação de UI)
+    if (panel && !panel.classList.contains("transparent-peek")) return;
+    
+    // 3. Validação de Ponteiros (Multitouch e Olho)
+    if (drawPointerId !== null) return; // Já tem um dedo desenhando
+    if (eyePointerId !== null && e.pointerId === eyePointerId) return; // Este é o dedo do olho
+
+    // 4. Iniciar Desenho
+    drawPointerId = e.pointerId;
+    try { board.setPointerCapture(e.pointerId); } catch(e){}
+
+    // Só prevenimos o padrão (scroll/zoom) agora que confirmamos que é um desenho
+    if (e.cancelable) e.preventDefault();
+
+    const p = getPt(e);
     if (mode === "swipe") { 
       swipeData.start = p; 
       // Sumiço Automático: no exato momento em que inicia o movimento, a animação para
@@ -275,6 +355,8 @@
   };
 
   window.onpointermove = (e) => {
+    if (drawPointerId !== null && e.pointerId !== drawPointerId) return;
+
     if (dragData.active) {
       const dx = e.clientX - dragData.startX;
       const dy = e.clientY - dragData.startY;
@@ -290,8 +372,10 @@
     drawSeg(currentStroke.p[currentStroke.p.length-2], p, currentStroke.c);
   };
 
-  window.onpointerup = (e) => {
-    if (dragData.active) { dragData.active = false; return; }
+  const endPointer = (e) => {
+    if (drawPointerId !== null && e.pointerId !== drawPointerId) return;
+
+    if (dragData.active) { dragData.active = false; drawPointerId = null; return; }
     if (mode === "swipe" && swipeData.start) {
       const arrow = getArrow(swipeData.start, getPt(e));
       swipeData.start = null;
@@ -304,7 +388,15 @@
       }
     }
     if (currentStroke) { strokes.push(currentStroke); currentStroke = null; render(); }
+    
+    if (drawPointerId !== null) {
+      drawPointerId = null;
+      try { board.releasePointerCapture(e.pointerId); } catch(e){}
+    }
   };
+
+  window.onpointerup = endPointer;
+  window.onpointercancel = endPointer;
 };
 
   const getPt = (e) => { const r = board.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
@@ -366,21 +458,11 @@
       if (card) {
         tempTopCard = card;
         visorL1.textContent = `TOPO: ${formatCard(card)}`;
-        
-        clearTimeout(peekTimer);
-        peekTimer = setTimeout(() => {
-          isYellowSwipe = false;
-          swipeData.arrows = [];
-          visorL1.textContent = "";
-          
-          color = "#FF3B30";
-          document.querySelectorAll(".swatch").forEach(s => {
-            s.classList.toggle("active", s.dataset.color === "#FF3B30");
-          });
-          
-          applyCfg();
-        }, 1000);
-        return;
+
+        color = "#111111";
+        document.querySelectorAll(".swatch").forEach(s => {
+          s.classList.toggle("active", s.dataset.color === "#111111");
+        });
       } else {
         visorL1.textContent = "ERRO";
       }
@@ -440,8 +522,9 @@
   };
 
   window.toggleSetup = () => {
+    if (eyePointerId !== null) return; // Evita abrir menu se estiver segurando o olho (opcional, mas seguro)
     if (mode === "setup") { mode = "draw"; setupPanel.classList.add("hidden"); visor.style.opacity = 0; applyCfg(); }
-    else { closeOtherPanels(); mode = "setup"; setupPanel.classList.remove("hidden"); applyCfg(); updateAdjustUI(); }
+    else { closeOtherPanels(); mode = "setup"; setupPanel.classList.remove("hidden"); window.setTarget('panelSetup'); }
   };
 
   const toggleSwipe = () => {
@@ -472,6 +555,12 @@
   window.openCardsAdjust = () => { window.setTarget('panelCards'); window.toggleCards(true); };
 
   const closeOtherPanels = () => {
+    // Failsafe: Garante que o modo transparente seja removido ao trocar de painéis
+    document.querySelectorAll(".panel").forEach(p => p.classList.remove("transparent-peek"));
+    eyePointerId = null;
+    if (floatingEyeBtn) floatingEyeBtn.style.display = "none";
+    minimizedPanelId = null;
+    
     setupPanel.classList.add("hidden"); trainPanel.classList.add("hidden"); cardsPanel.classList.add("hidden");
     if (mode === "swipe") { mode = "draw"; isYellowSwipe = false; }
     applyCfg();
@@ -518,14 +607,11 @@
   const renderStepper = (parent, label, axis, targetKey, step) => {
     const val = cfg[targetKey][axis];
     const displayVal = axis === 's' || axis === 'o' ? val.toFixed(2) : Math.round(val);
-    const inputId = `input_${targetKey}_${axis}_${Date.now()}`;
     const html = `
       <div class="stepper-control">
         <span class="stepper-label">${label}</span>
         <button class="stepper-btn" onclick="window.adjust('${axis}', -${step}, '${targetKey}')">-</button>
-        <input type="number" class="stepper-input" id="${inputId}" value="${displayVal}" 
-               onchange="window.adjustDirect('${axis}', this.value, '${targetKey}')" 
-               onclick="this.select()" step="${step}" />
+        <div class="stepper-input" style="display:flex; align-items:center; justify-content:center;">${displayVal}</div>
         <button class="stepper-btn" onclick="window.adjust('${axis}', ${step}, '${targetKey}')">+</button>
       </div>
     `;
@@ -574,8 +660,7 @@
     if (targetKey === 'number') {
       renderStepper(currentContainer, 'Posição X', 'x', targetKey, 1);
       renderStepper(currentContainer, 'Posição Y', 'y', targetKey, 1);
-      renderStepper(currentContainer, 'Largura', 's', targetKey, 1);
-      renderStepper(currentContainer, 'Altura', 'h', targetKey, 1);
+      renderStepper(currentContainer, 'Escala', 's', targetKey, 1);
     } else {
       renderStepper(currentContainer, 'Posição X', 'x', targetKey, 1);
       renderStepper(currentContainer, 'Posição Y', 'y', targetKey, 1);
@@ -586,14 +671,11 @@
     if (opacityContainer && (adjTarget === 'visor' || adjTarget === 'footer' || adjTarget.startsWith('panel'))) {
       const val = cfg[adjTarget].o || 0.5;
       const displayVal = Math.round(val * 100);
-      const inputId = `input_opacity_${Date.now()}`;
       const html = `
         <div class="stepper-control">
           <span class="stepper-label">Opacidade (%)</span>
           <button class="stepper-btn" onclick="window.adjust('o', -0.05, '${adjTarget}')">-</button>
-          <input type="number" class="stepper-input" id="${inputId}" value="${displayVal}" min="5" max="100" step="1"
-                 onchange="window.adjustDirect('o', parseFloat(this.value) / 100, '${adjTarget}')" 
-                 onclick="this.select()" />
+          <div class="stepper-input" style="display:flex; align-items:center; justify-content:center;">${displayVal}</div>
           <button class="stepper-btn" onclick="window.adjust('o', 0.05, '${adjTarget}')">+</button>
         </div>
       `;
@@ -620,7 +702,12 @@
       else if (axis === "y") target.y += val;
       else if (axis === "s") {
         if (targetKey === "toolbar" || targetKey.startsWith("panel")) target.s = Math.max(0.5, Math.min(2.0, target.s + val));
-        else if (targetKey === "number") { target.s += val; }
+        else if (targetKey === "number") { 
+          const oldS = target.s;
+          target.s += val;
+          // Ajuste proporcional da altura (h) baseado na nova escala (s)
+          if (oldS > 0) target.h = target.h * (target.s / oldS);
+        }
         else if (targetKey === "visor" || targetKey === "footer") { cfg.visor.s = Math.max(5, cfg.visor.s + val); cfg.footer.s = cfg.visor.s; }
         else target.s += val;
       }
@@ -664,6 +751,10 @@
     } else if (axis === "s") {
       if (targetKey === "toolbar" || targetKey.startsWith("panel")) {
         target.s = Math.max(0.5, Math.min(2.0, val));
+      } else if (targetKey === "number") {
+        const oldS = target.s;
+        target.s = val;
+        if (oldS > 0) target.h = target.h * (target.s / oldS);
       } else if (targetKey === "visor" || targetKey === "footer") {
         cfg.visor.s = Math.max(5, val);
         cfg.footer.s = cfg.visor.s;
@@ -706,7 +797,7 @@
     if (n !== null) { target.text = n; applyCfg(); }
   };
 
-  window.openTrainPanel = () => { window.setTarget('panelTrain'); closeOtherPanels(); mode = "train"; trainPanel.classList.remove("hidden"); loadTrain(trainNum || 1); updateAdjustUI(); applyCfg(); };
+  window.openTrainPanel = () => { window.setTarget('panelTrain'); closeOtherPanels(); mode = "train"; trainPanel.classList.remove("hidden"); loadTrain(trainNum || 1); window.setAdjustMode('panel'); applyCfg(); };
   window.toggleTrain = () => { mode = "draw"; trainPanel.classList.add("hidden"); applyCfg(); render(); };
   window.setAdjustMode = (m) => {
     adjustMode = m;
@@ -783,12 +874,75 @@
     blueBtn.addEventListener("touchstart", startBluePeek, { passive: true }); window.addEventListener("touchend", stopBluePeek, { passive: true });
   };
 
+  // Cria o botão flutuante dinamicamente
+  const createFloatingEyeBtn = () => {
+    floatingEyeBtn = document.createElement("div");
+    floatingEyeBtn.id = "floatingEyeBtn";
+    // Ícone de olho
+    floatingEyeBtn.innerHTML = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>`;
+    document.body.appendChild(floatingEyeBtn);
+
+    // Posição inicial padrão
+    let floatX = W - 70;
+    let floatY = 100;
+    floatingEyeBtn.style.left = floatX + "px";
+    floatingEyeBtn.style.top = floatY + "px";
+
+    // Lógica de Arrastar do Botão Flutuante
+    let isDragging = false;
+    let startX, startY, initialLeft, initialTop;
+
+    floatingEyeBtn.addEventListener("pointerdown", (e) => {
+      e.stopPropagation();
+      isDragging = false;
+      floatingEyeBtn.setPointerCapture(e.pointerId);
+      startX = e.clientX;
+      startY = e.clientY;
+      initialLeft = parseFloat(floatingEyeBtn.style.left);
+      initialTop = parseFloat(floatingEyeBtn.style.top);
+    });
+
+    floatingEyeBtn.addEventListener("pointermove", (e) => {
+      if (e.buttons === 0) return;
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+      if (Math.abs(dx) > 5 || Math.abs(dy) > 5) isDragging = true;
+      
+      floatingEyeBtn.style.left = (initialLeft + dx) + "px";
+      floatingEyeBtn.style.top = (initialTop + dy) + "px";
+    });
+
+    floatingEyeBtn.addEventListener("pointerup", (e) => {
+      floatingEyeBtn.releasePointerCapture(e.pointerId);
+      if (!isDragging) {
+        restorePanel();
+      }
+    });
+  };
+
+  const restorePanel = () => {
+    if (minimizedPanelId) {
+      const panel = document.getElementById(minimizedPanelId);
+      if (panel) panel.classList.remove("hidden");
+      floatingEyeBtn.style.display = "none";
+      minimizedPanelId = null;
+    }
+  };
+
   const initEyeButton = (btnId, panelId) => {
     const btn = document.getElementById(btnId); const panel = document.getElementById(panelId);
     if (!btn || !panel) return;
-    const startPeek = () => panel.classList.add("transparent-peek"); const stopPeek = () => panel.classList.remove("transparent-peek");
-    btn.addEventListener("mousedown", startPeek); window.addEventListener("mouseup", stopPeek);
-    btn.addEventListener("touchstart", startPeek, { passive: true }); btn.addEventListener("touchend", stopPeek, { passive: true });
+    
+    // Remove listeners antigos
+    btn.onpointerdown = null; btn.onpointerup = null; btn.onpointercancel = null;
+    
+    // Novo comportamento: Clique para minimizar
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      panel.classList.add("hidden");
+      minimizedPanelId = panelId;
+      if (floatingEyeBtn) floatingEyeBtn.style.display = "flex";
+    };
   };
 
   init();

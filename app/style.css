@@ -29,7 +29,7 @@ html, body {
   padding: 0;
   background: var(--bg);
   overflow: hidden;
-  position: relative;
+  position: fixed; /* Bala de Prata: Trava o viewport completamente no iOS */
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
 }
 
@@ -46,7 +46,7 @@ html, body {
 /* Aviso de Orientação */
 #orientationWarning {
   position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-  background: rgba(0, 0, 0, 0.9); z-index: 9999;
+  background: #000000; z-index: 9999;
   display: flex; align-items: center; justify-content: center; text-align: center;
   color: white; padding: 20px;
 }
@@ -150,7 +150,7 @@ html, body {
 /* Visor Unificado */
 .visor-container, .footer-container {
   position: absolute;
-  z-index: 500;
+  z-index: 3000; /* Acima de Painéis (2000) e Toolbar (1000) */
   pointer-events: none;
   text-align: center;
   font-size: 15px;
@@ -165,11 +165,20 @@ html, body {
 }
 
 .footer-container {
+  position: fixed;
   opacity: 1;
   font-weight: 400;
-  width: auto;
   white-space: nowrap;
-  min-width: 100%;
+
+  width: auto;
+  text-align: center;
+  z-index: 3000; /* Padronizado com o visor principal */
+  padding-bottom: 0 !important; /* Força remoção da Safe Area */
+  margin-bottom: 0 !important;
+  bottom: auto !important; /* Garante que o TOP controle a posição */
+  /* Bala de Prata: Aceleração de Hardware para evitar cortes na renderização */
+  transform: translateX(-50%) translateZ(0) !important;
+  -webkit-transform: translateX(-50%) translateZ(0) !important;
 }
 
 /* Painéis (Setup e Treino) */
@@ -196,7 +205,12 @@ html, body {
 }
 
 .panel.hidden { display: none !important; }
-.panel.transparent-peek { opacity: 0.05 !important; transition: opacity 0.2s ease; pointer-events: none; }
+.panel.transparent-peek { opacity: 0.05 !important; transition: opacity 0.2s ease; }
+/* Bloqueia eventos no conteúdo para permitir desenhar através */
+.panel.transparent-peek .scroll-content, .panel.transparent-peek .panel-footer { pointer-events: none !important; }
+/* Mantém Header e Olho interativos para evitar travamento */
+.panel.transparent-peek .panel-header, .panel.transparent-peek .panel-header * { pointer-events: auto !important; }
+.panel.transparent-peek .eye-button, .panel.transparent-peek .eye-button * { pointer-events: auto !important; }
 
 .panel-header { 
   padding: 16px 20px 12px;
@@ -455,4 +469,20 @@ html, body {
   background: rgba(0, 0, 0, 0.04);
   border-radius: 10px;
   padding: 6px 10px;
+}
+
+/* Botão de Olho Flutuante (Modo Minimizado) */
+#floatingEyeBtn {
+  position: fixed;
+  width: 48px; height: 48px;
+  border-radius: 50%;
+  background: var(--glass);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 0.5px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+  display: none; /* Inicia oculto */
+  align-items: center; justify-content: center;
+  z-index: 9999;
+  color: var(--accent);
 }
