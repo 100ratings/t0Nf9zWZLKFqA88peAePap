@@ -27,19 +27,37 @@ html, body {
   width: 100%;
   margin: 0;
   padding: 0;
-  background: var(--bg);
+  background: #ffffff;
   overflow: hidden;
-  position: fixed; /* Bala de Prata: Trava o viewport completamente no iOS */
+  position: relative;
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+  overscroll-behavior: none;
+  touch-action: manipulation;
+}
+
+/* Forçar preenchimento total para evitar telas brancas */
+html, body {
+  width: 100vw;
+  height: 100vh;
+  position: fixed;
+  top: 0;
+  left: 0;
+}
+
+/* Container raiz do app precisa ocupar a tela inteira */
+#app, .app, main {
+  position: fixed;
+  inset: 0;
+  background: #000;
 }
 
 #board {
   position: absolute;
-  top: 0;
-  left: 0;
+  inset: 0;
   width: 100%;
   height: 100%;
   background: #fff;
+  display: block;
   z-index: 1;
 }
 
