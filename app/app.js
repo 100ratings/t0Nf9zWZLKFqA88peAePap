@@ -16,6 +16,7 @@
   let mode = "draw"; 
   let color = "#111111";
   let strokes = [];
+  let historyStrokes = [];
   let currentStroke = null;
   let drawPointerId = null;
   let eyePointerId = null;
@@ -47,6 +48,7 @@
     panelTrain: { x: 50, y: 10, s: 1, o: 0.6, label: "Desenhos de Números" },
     panelCards: { x: 50, y: 10, s: 1, o: 0.6, label: "Painel de Cartas" },
     inputType: "swipe",
+    yellowTarget: "top",
     peekDuration: 1.0
   }));
 
@@ -57,6 +59,7 @@
     if (cfg.visor.o === undefined) cfg.visor.o = 0.3;
     if (cfg.footer.o === undefined) cfg.footer.o = 0.3;
     if (cfg.inputType === undefined) cfg.inputType = "swipe";
+    if (cfg.yellowTarget === undefined) cfg.yellowTarget = "top";
     cfg.peekDuration = 1.0;
     if (!cfg.panelSetup) cfg.panelSetup = { x: 50, y: 10, s: 1, o: 0.6, label: "Painel de Configurações" };
     if (!cfg.panelTrain) cfg.panelTrain = { x: 50, y: 10, s: 1, o: 0.6, label: "Desenhos de Números" };
@@ -230,6 +233,8 @@
       if (s.dataset.color === "#F7C600") s.classList.toggle("swipe-active", mode === "swipe" && isYellowSwipe);
     });
     document.getElementById("inputCardsBtn").classList.toggle("active", cfg.inputType === "cards");
+    if (document.getElementById("yellowTargetTopBtn")) document.getElementById("yellowTargetTopBtn").classList.toggle("active", cfg.yellowTarget === "top");
+    if (document.getElementById("yellowTargetBottomBtn")) document.getElementById("yellowTargetBottomBtn").classList.toggle("active", cfg.yellowTarget === "bottom");
     document.getElementById("invertOrderBtn").textContent = cfg.visor.inverted ? "Ordem: 05 4H → 4H 05" : "Ordem: 4H 05 → 05 4H";
     document.getElementById("togglePeekStyleBtn").textContent = `Estilo: ${cfg.visor.peekStyle === 'cardOnly' ? 'Apenas Carta' : 'Carta + Posição'}`;
 
@@ -270,11 +275,14 @@
           if (tapCounts[key] >= limit) { action(); tapCounts[key] = 0; }
         };
 
-        if (c === "#FF3B30" || c === "#F7C600") {
-          strokes = []; render();
-          if (c === "#FF3B30") {
-            if (cfg.inputType === "cards") window.toggleCards(false);
-            else updateTap('red', 1, toggleSwipe);
+        if (c === "#FF3B30") {
+          if (cfg.inputType === "cards") window.toggleCards(false);
+          else updateTap('red', 1, toggleSwipe);
+        }
+        if (c === "#F7C600") {
+          if (cfg.inputType === "cards") {
+            isYellowSwipe = true;
+            window.toggleCards(false);
           } else {
             updateTap('yellow', 1, toggleYellowSwipe);
           }
@@ -298,13 +306,48 @@
     window.addEventListener("visibilitychange", resetInteractionState);
 
     document.getElementById("undoBtn").onclick = (e) => { e.stopPropagation(); strokes.pop(); render(); };
-    document.getElementById("clearBtn").onclick = (e) => { 
+    
+    const clearBtn = document.getElementById("clearBtn");
+    let trashHoldTimer = null;
+    let isTrashHolding = false;
+
+    const startTrashPeek = (e) => {
+      if (e.cancelable) e.preventDefault();
+      trashHoldTimer = setTimeout(() => {
+        isTrashHolding = true;
+        render(historyStrokes);
+      }, 150);
+    };
+
+    const stopTrashPeek = (e) => {
+      clearTimeout(trashHoldTimer);
+      if (isTrashHolding) {
+        isTrashHolding = false;
+        render();
+      }
+    };
+
+    clearBtn.addEventListener("mousedown", startTrashPeek);
+    window.addEventListener("mouseup", stopTrashPeek);
+    clearBtn.addEventListener("touchstart", startTrashPeek, { passive: true });
+    window.addEventListener("touchend", stopTrashPeek, { passive: true });
+
+    clearBtn.onclick = (e) => { 
+      if (isTrashHolding) return;
       e.stopPropagation(); 
+      if (strokes.length > 0) historyStrokes = [...strokes];
       strokes = []; 
       swipeData.arrows = []; 
       if (mode === "swipe") { mode = "draw"; visor.style.opacity = 0; isYellowSwipe = false; }
       if (mode === "cards") window.toggleCards();
       tempTopCard = null;
+      
+      // Ativar botão preto
+      color = "#111111";
+      document.querySelectorAll(".swatch").forEach(b => {
+        b.classList.toggle("active", b.dataset.color === "#111111");
+      });
+
       resetInteractionState();
       applyCfg();
       render(); 
@@ -455,9 +498,9 @@
     ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke(); ctx.restore();
   };
 
-  const render = () => {
+  const render = (targetStrokes = strokes) => {
     ctx.clearRect(0, 0, board.width, board.height);
-    strokes.forEach(s => {
+    targetStrokes.forEach(s => {
       ctx.save(); ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.lineWidth = 6; ctx.strokeStyle = s.c;
       ctx.beginPath(); ctx.moveTo(s.p[0].x, s.p[0].y);
       for (let i = 1; i < s.p.length; i++) ctx.lineTo(s.p[i].x, s.p[i].y);
@@ -506,8 +549,15 @@
     
     if (isYellowSwipe) {
       if (card) {
-        tempTopCard = card;
-        visorL1.textContent = `TOPO: ${formatCard(card)}`;
+        if (cfg.yellowTarget === "bottom") {
+          const pos = posMap[card];
+          const topPos = (pos % 52) + 1;
+          tempTopCard = STACK[topPos - 1];
+          visorL1.textContent = `BOCA: ${formatCard(card)}`;
+        } else {
+          tempTopCard = card;
+          visorL1.textContent = `TOPO: ${formatCard(card)}`;
+        }
 
         color = "#111111";
         document.querySelectorAll(".swatch").forEach(s => {
@@ -592,7 +642,19 @@
   };
 
   window.toggleCards = (isAdjust = false) => {
-    if (mode === "cards") { mode = "draw"; cardsPanel.classList.add("hidden"); if (lastResult) { visor.style.opacity = cfg.visor.o; clearTimeout(peekTimer); peekTimer = setTimeout(() => { if (mode === "draw") visor.style.opacity = 0; }, cfg.peekDuration * 1000); } else { visor.style.opacity = 0; } isCardsAdjustMode = false; }
+    if (mode === "cards") { 
+      mode = "draw"; 
+      cardsPanel.classList.add("hidden"); 
+      if (lastResult) { 
+        visor.style.opacity = cfg.visor.o; 
+        clearTimeout(peekTimer); 
+        peekTimer = setTimeout(() => { if (mode === "draw") visor.style.opacity = 0; }, cfg.peekDuration * 1000); 
+      } else { 
+        visor.style.opacity = 0; 
+      } 
+      isCardsAdjustMode = false; 
+      isYellowSwipe = false;
+    }
     else { 
       closeOtherPanels(); mode = "cards"; cardsPanel.classList.remove("hidden"); 
       isCardsAdjustMode = isAdjust;
@@ -631,9 +693,40 @@
     const suitEmoji = {"S":"♠️","H":"♥️","C":"♣️","D":"♦️"}[cardInputData.suit] || "";
     cardInputDisplay.textContent = `${cardInputData.rank}${suitEmoji} ${cardInputData.digits.padEnd(2, '-')}`;
     
-    if (cardInputData.rank && cardInputData.suit && cardInputData.digits.length === 2) {
-      processResult(cardInputData.rank + cardInputData.suit, parseInt(cardInputData.digits));
-      if (!isCardsAdjustMode) window.toggleCards();
+    if (isYellowSwipe) {
+      if (cardInputData.rank && cardInputData.suit) {
+        resolveCardInput(cardInputData.rank + cardInputData.suit);
+        if (!isCardsAdjustMode) window.toggleCards();
+      }
+    } else {
+      if (cardInputData.rank && cardInputData.suit && cardInputData.digits.length === 2) {
+        processResult(cardInputData.rank + cardInputData.suit, parseInt(cardInputData.digits));
+        if (!isCardsAdjustMode) window.toggleCards();
+      }
+    }
+  };
+
+  const resolveCardInput = (card) => {
+    if (isYellowSwipe) {
+      if (cfg.yellowTarget === "bottom") {
+        const pos = posMap[card];
+        const topPos = (pos % 52) + 1;
+        tempTopCard = STACK[topPos - 1];
+        visorL1.textContent = `BOCA: ${formatCard(card)}`;
+      } else {
+        tempTopCard = card;
+        visorL1.textContent = `TOPO: ${formatCard(card)}`;
+      }
+      color = "#111111";
+      document.querySelectorAll(".swatch").forEach(s => {
+        s.classList.toggle("active", s.dataset.color === "#111111");
+      });
+      
+      clearTimeout(peekTimer);
+      peekTimer = setTimeout(() => { 
+        if (mode !== "setup" && mode !== "cards" && mode !== "train") { visor.style.opacity = 0; setTimeout(() => { if (mode === "draw") visorL1.textContent = cfg.visor.text; }, 300); }
+        isYellowSwipe = false;
+      }, cfg.peekDuration * 1000);
     }
   };
 
@@ -652,6 +745,7 @@
   };
 
   window.setInputType = (type) => { cfg.inputType = type; applyCfg(); };
+  window.setYellowTarget = (target) => { cfg.yellowTarget = target; applyCfg(); };
 
   // Funções de Ajuste Aprimoradas
   const renderStepper = (parent, label, axis, targetKey, step) => {

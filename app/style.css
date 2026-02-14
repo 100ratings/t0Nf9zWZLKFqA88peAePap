@@ -32,6 +32,7 @@ html, body {
   position: relative;
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
   overscroll-behavior: none;
+  touch-action: manipulation;
 }
 
 /* Forçar preenchimento total para evitar telas brancas */
