@@ -509,7 +509,6 @@
   };
 
   const stamp = (n) => {
-    strokes = []; // Garante limpeza antes de carregar o novo número
     const numKey = parseInt(n); const g = JSON.parse(localStorage.getItem(`v6_g_${numKey}`) || "null");
     
     // Prioridade: Ajuste individual do número (g.cfg) ou ajuste global (cfg.number)
@@ -530,22 +529,14 @@
 
   const toggleSwipe = () => {
     if (mode === "swipe") { mode = "draw"; visor.style.opacity = 0; isYellowSwipe = false; }
-    else { 
-      closeOtherPanels(); 
-      mode = "swipe"; 
-      visor.style.opacity = cfg.visor.o; 
-      visorL1.textContent = ""; 
-      isYellowSwipe = false; 
-      strokes = []; 
-      render(); 
-    }
+    else { closeOtherPanels(); mode = "swipe"; visor.style.opacity = cfg.visor.o; visorL1.textContent = ""; isYellowSwipe = false; strokes = []; render(); }
     swipeData.arrows = [];
     applyCfg();
   };
 
   const toggleYellowSwipe = () => {
     if (mode === "swipe" && isYellowSwipe) { mode = "draw"; visor.style.opacity = 0; isYellowSwipe = false; }
-    else { closeOtherPanels(); mode = "swipe"; visor.style.opacity = cfg.visor.o; visorL1.textContent = ""; isYellowSwipe = true; }
+    else { closeOtherPanels(); mode = "swipe"; visor.style.opacity = cfg.visor.o; visorL1.textContent = ""; isYellowSwipe = true; strokes = []; render(); }
     swipeData.arrows = [];
     applyCfg();
   };
@@ -557,6 +548,7 @@
       isCardsAdjustMode = isAdjust;
       cardsAdjustControls.classList.toggle("hidden", !isAdjust);
       visor.style.opacity = cfg.visor.o; visorL1.textContent = lastResult || getExamplePeek(); resetCardInput(); 
+      if (!isAdjust) { strokes = []; render(); }
       if (isAdjust) updateAdjustUI();
     }
   };
@@ -600,7 +592,6 @@
     cardInputData = { rank: "", suit: "", digits: "" }; 
     cardInputDisplay.textContent = "--- --"; 
     document.querySelectorAll("#panelCards .card-btn").forEach(b => b.classList.remove("active"));
-    strokes = []; render(); // Limpa o desenho ao resetar o input de cartas
   };
 
   window.setTarget = (t) => { 
