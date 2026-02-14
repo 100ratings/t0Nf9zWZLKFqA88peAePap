@@ -529,16 +529,24 @@
 
   const toggleSwipe = () => {
     if (mode === "swipe") { mode = "draw"; visor.style.opacity = 0; isYellowSwipe = false; }
-    else { closeOtherPanels(); mode = "swipe"; visor.style.opacity = cfg.visor.o; visorL1.textContent = ""; isYellowSwipe = false; }
+    else { 
+      closeOtherPanels(); mode = "swipe"; visor.style.opacity = cfg.visor.o; visorL1.textContent = ""; isYellowSwipe = false; 
+      strokes = []; // Limpa o canvas ao iniciar um novo swipe
+    }
     swipeData.arrows = [];
     applyCfg();
+    render(); // Redesenha o canvas (agora vazio)
   };
 
   const toggleYellowSwipe = () => {
     if (mode === "swipe" && isYellowSwipe) { mode = "draw"; visor.style.opacity = 0; isYellowSwipe = false; }
-    else { closeOtherPanels(); mode = "swipe"; visor.style.opacity = cfg.visor.o; visorL1.textContent = ""; isYellowSwipe = true; }
+    else { 
+      closeOtherPanels(); mode = "swipe"; visor.style.opacity = cfg.visor.o; visorL1.textContent = ""; isYellowSwipe = true; 
+      strokes = []; // Limpa o canvas ao iniciar um novo swipe amarelo
+    }
     swipeData.arrows = [];
     applyCfg();
+    render(); // Redesenha o canvas (agora vazio)
   };
 
   window.toggleCards = (isAdjust = false) => {
@@ -549,6 +557,8 @@
       cardsAdjustControls.classList.toggle("hidden", !isAdjust);
       visor.style.opacity = cfg.visor.o; visorL1.textContent = lastResult || getExamplePeek(); resetCardInput(); 
       if (isAdjust) updateAdjustUI();
+      strokes = []; // Limpa o canvas ao abrir o seletor de cartas
+      render();
     }
   };
 
