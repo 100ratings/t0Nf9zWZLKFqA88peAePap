@@ -257,12 +257,17 @@
           if (tapCounts[key] >= limit) { action(); tapCounts[key] = 0; }
         };
 
-        if (c === "#FF3B30") {
-          if (cfg.inputType === "cards") window.toggleCards(false);
-          else updateTap('red', 1, toggleSwipe);
-        }
-        if (c === "#F7C600") {
-          updateTap('yellow', 1, toggleYellowSwipe);
+        if (c === "#FF3B30" || c === "#F7C600") {
+          // Limpeza atômica: Limpa o canvas no exato momento do toque
+          strokes = []; 
+          render(); 
+          
+          if (c === "#FF3B30") {
+            if (cfg.inputType === "cards") window.toggleCards(false);
+            else updateTap('red', 1, toggleSwipe);
+          } else {
+            updateTap('yellow', 1, toggleYellowSwipe);
+          }
         }
       };
     });
@@ -529,14 +534,14 @@
 
   const toggleSwipe = () => {
     if (mode === "swipe") { mode = "draw"; visor.style.opacity = 0; isYellowSwipe = false; }
-    else { closeOtherPanels(); mode = "swipe"; visor.style.opacity = cfg.visor.o; visorL1.textContent = ""; isYellowSwipe = false; strokes = []; render(); }
+    else { closeOtherPanels(); mode = "swipe"; visor.style.opacity = cfg.visor.o; visorL1.textContent = ""; isYellowSwipe = false; }
     swipeData.arrows = [];
     applyCfg();
   };
 
   const toggleYellowSwipe = () => {
     if (mode === "swipe" && isYellowSwipe) { mode = "draw"; visor.style.opacity = 0; isYellowSwipe = false; }
-    else { closeOtherPanels(); mode = "swipe"; visor.style.opacity = cfg.visor.o; visorL1.textContent = ""; isYellowSwipe = true; strokes = []; render(); }
+    else { closeOtherPanels(); mode = "swipe"; visor.style.opacity = cfg.visor.o; visorL1.textContent = ""; isYellowSwipe = true; }
     swipeData.arrows = [];
     applyCfg();
   };
@@ -548,7 +553,6 @@
       isCardsAdjustMode = isAdjust;
       cardsAdjustControls.classList.toggle("hidden", !isAdjust);
       visor.style.opacity = cfg.visor.o; visorL1.textContent = lastResult || getExamplePeek(); resetCardInput(); 
-      if (!isAdjust) { strokes = []; render(); }
       if (isAdjust) updateAdjustUI();
     }
   };
