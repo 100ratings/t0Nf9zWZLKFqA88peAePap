@@ -528,25 +528,35 @@
   };
 
   const toggleSwipe = () => {
-    if (mode === "swipe") { mode = "draw"; visor.style.opacity = 0; isYellowSwipe = false; }
-    else { 
-      closeOtherPanels(); mode = "swipe"; visor.style.opacity = cfg.visor.o; visorL1.textContent = ""; isYellowSwipe = false; 
-      strokes = []; // Limpa o canvas ao iniciar um novo swipe
+    if (mode === "swipe" && !isYellowSwipe) { 
+      mode = "draw"; visor.style.opacity = 0; 
+    } else { 
+      closeOtherPanels(); 
+      mode = "swipe"; 
+      isYellowSwipe = false;
+      visor.style.opacity = cfg.visor.o; 
+      visorL1.textContent = ""; 
+      strokes = []; // Limpa o canvas ao iniciar um novo comando
     }
     swipeData.arrows = [];
     applyCfg();
-    render(); // Redesenha o canvas (agora vazio)
+    render(); // Força a limpeza visual do canvas
   };
 
   const toggleYellowSwipe = () => {
-    if (mode === "swipe" && isYellowSwipe) { mode = "draw"; visor.style.opacity = 0; isYellowSwipe = false; }
-    else { 
-      closeOtherPanels(); mode = "swipe"; visor.style.opacity = cfg.visor.o; visorL1.textContent = ""; isYellowSwipe = true; 
-      strokes = []; // Limpa o canvas ao iniciar um novo swipe amarelo
+    if (mode === "swipe" && isYellowSwipe) { 
+      mode = "draw"; visor.style.opacity = 0; isYellowSwipe = false; 
+    } else { 
+      closeOtherPanels(); 
+      mode = "swipe"; 
+      isYellowSwipe = true;
+      visor.style.opacity = cfg.visor.o; 
+      visorL1.textContent = ""; 
+      strokes = []; // Limpa o canvas ao iniciar um novo comando amarelo
     }
     swipeData.arrows = [];
     applyCfg();
-    render(); // Redesenha o canvas (agora vazio)
+    render(); // Força a limpeza visual do canvas
   };
 
   window.toggleCards = (isAdjust = false) => {
