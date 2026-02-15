@@ -37,6 +37,10 @@
   let peekTimer = null;
   let floatingEyeBtn = null;
   let minimizedPanelId = null;
+  
+  // Variáveis Wake Lock
+  let wakeLock = null;
+  let shouldKeepAwake = false; // Flag para saber se o usuário já autorizou manter acordado
 
   let cfg = JSON.parse(localStorage.getItem("mnem_v6_cfg") || JSON.stringify({
     visor: { x: 50, y: 70, s: 15, lh: 1.1, y2: 0, text: "…", label: "Peek Principal", inverted: false, useEmoji: false, o: 0.3 },
@@ -178,13 +182,10 @@
       visorL1.classList.remove("loading-dots-animation");
     } else if (mode === "swipe") {
       visor.style.opacity = cfg.visor.o;
-      // Animação Inteligente: pontos aparecem apenas enquanto aguarda o comando (arrows.length === 0)
-      // E apenas se o swipe ainda não começou (swipeData.start === null)
       if (swipeData.arrows.length === 0 && !swipeData.start) {
         visorL1.textContent = "";
         visorL1.classList.add("loading-dots-animation");
       } else {
-        // Sumiço Automático: ao iniciar o swipe ou ter setas, a animação para
         visorL1.classList.remove("loading-dots-animation");
       }
     } else {
@@ -196,12 +197,10 @@
     footer.style.left = (cfg.footer.x * W / 100) + "px";
     footer.style.top = (cfg.footer.y * H / 100) + "px";
     footer.style.fontSize = cfg.footer.s + "px";
-    footer.style.bottom = "auto"; // Garante que nada force ele para cima
-    footer.style.pointerEvents = "none"; // Bala de Prata: Garante que o toque passe direto (Ghost Element)
+    footer.style.bottom = "auto"; 
+    footer.style.pointerEvents = "none"; 
     footer.style.opacity = cfg.footer.o;
     
-    // Preservação Total: O footer (Peek de Apoio) SEMPRE mantém o último resultado se existir.
-    // Ele não deve sumir ou resetar para o texto padrão ao tocar no vermelho ou lixeira.
     footer.textContent = lastFooterResult || cfg.footer.text;
 
     const panels = { "toolbar": "toolbar", "setupPanel": "panelSetup", "trainPanel": "panelTrain", "panelCards": "panelCards" };
@@ -228,7 +227,6 @@
     document.getElementById("toggleEmojiBtn").textContent = `Símbolos de Naipes: ${cfg.visor.useEmoji ? 'ON' : 'OFF'}`;
     document.getElementById("inputSwipeBtn").classList.toggle("active", cfg.inputType === "swipe");
     document.getElementById("swatchGroup").querySelectorAll(".swatch").forEach(s => {
-      // O pontinho de cima (swipe-active) agora mostra a animação de carregamento (. .. ...)
       if (s.dataset.color === "#FF3B30") s.classList.toggle("swipe-active", mode === "swipe" && !isYellowSwipe);
       if (s.dataset.color === "#F7C600") s.classList.toggle("swipe-active", mode === "swipe" && isYellowSwipe);
     });
@@ -245,9 +243,29 @@
     localStorage.setItem("mnem_v6_cfg", JSON.stringify(cfg));
   };
 
+  // Funções de Wake Lock Melhoradas
+  const requestWakeLock = async () => {
+    if ('wakeLock' in navigator) {
+      try {
+        wakeLock = await navigator.wakeLock.request('screen');
+        shouldKeepAwake = true; // Usuário ativou a primeira vez
+        console.log('Wake Lock Permanente Ativo');
+        
+        // Se o Wake Lock for liberado pelo sistema (ex: bateria fraca), tenta reativar
+        wakeLock.addEventListener('release', () => {
+          console.log('Wake Lock liberado pelo sistema');
+          if (shouldKeepAwake && document.visibilityState === 'visible') {
+            setTimeout(requestWakeLock, 1000);
+          }
+        });
+      } catch (err) {
+        console.error(`${err.name}, ${err.message}`);
+      }
+    }
+  };
+
   const bindEvents = () => {
     document.querySelectorAll(".swatch").forEach(s => {
-      // Lógica de segurar para o botão preto (Setup) - 3 segundos
       if (s.dataset.color === "#111111") {
         let blackTimer = null;
         s.addEventListener("pointerdown", (e) => {
@@ -276,6 +294,8 @@
         };
 
         if (c === "#FF3B30") {
+          // Ativa o Wake Lock Permanente no primeiro clique no botão vermelho
+          requestWakeLock();
           if (cfg.inputType === "cards") window.toggleCards(false);
           else updateTap('red', 1, toggleSwipe);
         }
@@ -290,20 +310,23 @@
       };
     });
 
-    // Failsafe global: Limpar estados ao clicar em botões de controle críticos
     const resetInteractionState = () => {
       drawPointerId = null;
       eyePointerId = null;
       currentStroke = null;
       document.querySelectorAll(".panel").forEach(p => p.classList.remove("transparent-peek"));
       try { board.releasePointerCapture(); } catch(e){}
-      // Só esconde o botão flutuante se NÃO estivermos em modo minimizado
       if (floatingEyeBtn && !minimizedPanelId) floatingEyeBtn.style.display = "none";
     };
     
-    // Failsafes de emergência para evitar travamento total (iOS/Multitouch)
     window.addEventListener("blur", resetInteractionState);
-    window.addEventListener("visibilitychange", resetInteractionState);
+    window.addEventListener("visibilitychange", async () => {
+      resetInteractionState();
+      // Se o app voltar a ficar visível e o Wake Lock deveria estar ativo, reativa
+      if (shouldKeepAwake && document.visibilityState === 'visible') {
+        requestWakeLock();
+      }
+    });
 
     document.getElementById("undoBtn").onclick = (e) => { e.stopPropagation(); strokes.pop(); render(); };
     
@@ -338,11 +361,14 @@
       if (strokes.length > 0) historyStrokes = [...strokes];
       strokes = []; 
       swipeData.arrows = []; 
-      if (mode === "swipe") { mode = "draw"; visor.style.opacity = 0; isYellowSwipe = false; }
+      if (mode === "swipe") { 
+        mode = "draw"; 
+        visor.style.opacity = 0; 
+        isYellowSwipe = false; 
+      }
       if (mode === "cards") window.toggleCards();
       tempTopCard = null;
       
-      // Ativar botão preto
       color = "#111111";
       document.querySelectorAll(".swatch").forEach(b => {
         b.classList.toggle("active", b.dataset.color === "#111111");
@@ -355,142 +381,130 @@
 
     let dragData = { active: false, startX: 0, startY: 0, initialX: 0, initialY: 0, axis: null, target: null };
 
-  window.onpointerdown = (e) => {
-    // 1. Interações de UI (Botões, Toolbar, Telas de bloqueio)
-    // Se for um elemento interativo, deixamos o evento passar e não desenhamos
-    if (e.target.closest(".stepper-btn") || 
-        e.target.closest(".swatch") || 
-        e.target.closest("button") || 
-        e.target.closest("input") ||
-        e.target.closest("#toolbar") || 
-        e.target.closest("#activationScreen") || 
-        e.target.closest("#installScreen") || 
-        e.target.closest("#orientationWarning") ||
-        e.target.closest("#floatingEyeBtn")) {
-      
-      // Lógica específica para os botões de ajuste (stepper) que usam drag
-      const stepperBtn = e.target.closest(".stepper-btn");
-      if (stepperBtn) {
-        const onclick = stepperBtn.getAttribute("onclick");
-        const match = onclick && onclick.match(/window\.adjust\('([^']*)', ([-.0-9]*), '([^']*)'\)/);
-        if (match) {
-          e.preventDefault();
-          if (drawPointerId !== null) return;
-          if (eyePointerId !== null && e.pointerId === eyePointerId) return;
-          drawPointerId = e.pointerId;
-          const [_, axis, val, targetKey] = match;
-          dragData = { active: true, startX: e.clientX, startY: e.clientY, initialVal: cfg[targetKey][axis], axis, targetKey };
-          window.adjust(axis, parseFloat(val), targetKey);
+    window.onpointerdown = (e) => {
+      if (e.target.closest(".stepper-btn") || 
+          e.target.closest(".swatch") || 
+          e.target.closest("button") || 
+          e.target.closest("input") ||
+          e.target.closest("#toolbar") || 
+          e.target.closest("#activationScreen") || 
+          e.target.closest("#installScreen") || 
+          e.target.closest("#orientationWarning") ||
+          e.target.closest("#floatingEyeBtn")) {
+        
+        const stepperBtn = e.target.closest(".stepper-btn");
+        if (stepperBtn) {
+          const onclick = stepperBtn.getAttribute("onclick");
+          const match = onclick && onclick.match(/window\.adjust\('([^']*)', ([-.0-9]*), '([^']*)'\)/);
+          if (match) {
+            e.preventDefault();
+            if (drawPointerId !== null) return;
+            if (eyePointerId !== null && e.pointerId === eyePointerId) return;
+            drawPointerId = e.pointerId;
+            const [_, axis, val, targetKey] = match;
+            dragData = { active: true, startX: e.clientX, startY: e.clientY, initialVal: cfg[targetKey][axis], axis, targetKey };
+            window.adjust(axis, parseFloat(val), targetKey);
+          }
         }
+        return;
       }
-      return;
-    }
 
-    // 2. Lógica do Painel (Setup/Treino/Cartas)
-    const panel = e.target.closest(".panel");
-    // Se tocou no painel e ele NÃO está transparente, bloqueia o desenho (é interação de UI)
-    if (panel && !panel.classList.contains("transparent-peek")) return;
-    
-    // 3. Validação de Ponteiros (Multitouch e Olho)
-    if (drawPointerId !== null) return; // Já tem um dedo desenhando
-    if (eyePointerId !== null && e.pointerId === eyePointerId) return; // Este é o dedo do olho
+      const panel = e.target.closest(".panel");
+      if (panel && !panel.classList.contains("transparent-peek")) return;
+      
+      if (drawPointerId !== null) return; 
+      if (eyePointerId !== null && e.pointerId === eyePointerId) return; 
 
-    // 4. Restrição de Área (Não desenhar abaixo dos botões da toolbar)
-    const toolbarEl = document.getElementById("toolbar");
-    if (toolbarEl && cfg.toolbar.visible) {
-      const swatchGroup = document.getElementById("swatchGroup");
-      if (swatchGroup) {
-        const rect = swatchGroup.getBoundingClientRect();
-        // Se o toque for abaixo da base dos botões, ignoramos o desenho
-        if (e.clientY >= rect.bottom) return;
-      } else {
-        const rect = toolbarEl.getBoundingClientRect();
-        if (e.clientY >= rect.top) return;
-      }
-    }
-
-    // 5. Iniciar Desenho
-    drawPointerId = e.pointerId;
-    try { board.setPointerCapture(e.pointerId); } catch(e){}
-
-    // Só prevenimos o padrão (scroll/zoom) agora que confirmamos que é um desenho
-    if (e.cancelable) e.preventDefault();
-
-    const p = getPt(e);
-    if (mode === "swipe") { 
-      swipeData.start = p; 
-      // Sumiço Automático: no exato momento em que inicia o movimento, a animação para
-      applyCfg();
-      return; 
-    }
-    currentStroke = { c: mode === "train" ? "#111111" : color, p: [p] };
-  };
-
-  window.onpointermove = (e) => {
-    if (drawPointerId !== null && e.pointerId !== drawPointerId) return;
-
-    // Se estiver desenhando, verificar se entrou na área proibida (abaixo dos botões)
-    if (currentStroke) {
       const toolbarEl = document.getElementById("toolbar");
       if (toolbarEl && cfg.toolbar.visible) {
         const swatchGroup = document.getElementById("swatchGroup");
         if (swatchGroup) {
           const rect = swatchGroup.getBoundingClientRect();
-          if (e.clientY >= rect.bottom) {
-            endPointer(e);
-            return;
-          }
+          if (e.clientY >= rect.bottom) return;
         } else {
           const rect = toolbarEl.getBoundingClientRect();
-          if (e.clientY >= rect.top) {
-            endPointer(e);
-            return;
+          if (e.clientY >= rect.top) return;
+        }
+      }
+
+      drawPointerId = e.pointerId;
+      try { board.setPointerCapture(e.pointerId); } catch(e){}
+
+      if (e.cancelable) e.preventDefault();
+
+      const p = getPt(e);
+      if (mode === "swipe") { 
+        swipeData.start = p; 
+        applyCfg();
+        return; 
+      }
+      currentStroke = { c: mode === "train" ? "#111111" : color, p: [p] };
+    };
+
+    window.onpointermove = (e) => {
+      if (drawPointerId !== null && e.pointerId !== drawPointerId) return;
+
+      if (currentStroke) {
+        const toolbarEl = document.getElementById("toolbar");
+        if (toolbarEl && cfg.toolbar.visible) {
+          const swatchGroup = document.getElementById("swatchGroup");
+          if (swatchGroup) {
+            const rect = swatchGroup.getBoundingClientRect();
+            if (e.clientY >= rect.bottom) {
+              endPointer(e);
+              return;
+            }
+          } else {
+            const rect = toolbarEl.getBoundingClientRect();
+            if (e.clientY >= rect.top) {
+              endPointer(e);
+              return;
+            }
           }
         }
       }
-    }
 
-    if (dragData.active) {
-      const dx = e.clientX - dragData.startX;
-      const dy = e.clientY - dragData.startY;
-      const delta = Math.abs(dx) > Math.abs(dy) ? dx : -dy;
-      const sensitivity = (dragData.axis === 's' && (dragData.targetKey.startsWith('panel') || dragData.targetKey === 'toolbar')) || dragData.axis === 'o' ? 0.005 : 0.2;
-      const newVal = dragData.initialVal + delta * sensitivity;
-      window.adjustDirect(dragData.axis, newVal, dragData.targetKey);
-      return;
-    }
-    if (!currentStroke) return;
-    const p = getPt(e); e.preventDefault();
-    currentStroke.p.push(p);
-    drawSeg(currentStroke.p[currentStroke.p.length-2], p, currentStroke.c);
-  };
-
-  const endPointer = (e) => {
-    if (drawPointerId !== null && e.pointerId !== drawPointerId) return;
-
-    if (dragData.active) { dragData.active = false; drawPointerId = null; return; }
-    if (mode === "swipe" && swipeData.start) {
-      const arrow = getArrow(swipeData.start, getPt(e));
-      swipeData.start = null;
-      if (arrow) { 
-        swipeData.arrows.push(arrow); 
-        updateVisorProgress(); 
-        visor.style.opacity = cfg.visor.o; 
-        const targetLen = isYellowSwipe ? 3 : 7;
-        if (swipeData.arrows.length === targetLen) resolveSwipe(); 
+      if (dragData.active) {
+        const dx = e.clientX - dragData.startX;
+        const dy = e.clientY - dragData.startY;
+        const delta = Math.abs(dx) > Math.abs(dy) ? dx : -dy;
+        const sensitivity = (dragData.axis === 's' && (dragData.targetKey.startsWith('panel') || dragData.targetKey === 'toolbar')) || dragData.axis === 'o' ? 0.005 : 0.2;
+        const newVal = dragData.initialVal + delta * sensitivity;
+        window.adjustDirect(dragData.axis, newVal, dragData.targetKey);
+        return;
       }
-    }
-    if (currentStroke) { strokes.push(currentStroke); currentStroke = null; render(); }
-    
-    if (drawPointerId !== null) {
-      drawPointerId = null;
-      try { board.releasePointerCapture(e.pointerId); } catch(e){}
-    }
-  };
+      if (!currentStroke) return;
+      const p = getPt(e); e.preventDefault();
+      currentStroke.p.push(p);
+      drawSeg(currentStroke.p[currentStroke.p.length-2], p, currentStroke.c);
+    };
 
-  window.onpointerup = endPointer;
-  window.onpointercancel = endPointer;
-};
+    const endPointer = (e) => {
+      if (drawPointerId !== null && e.pointerId !== drawPointerId) return;
+
+      if (dragData.active) { dragData.active = false; drawPointerId = null; return; }
+      if (mode === "swipe" && swipeData.start) {
+        const arrow = getArrow(swipeData.start, getPt(e));
+        swipeData.start = null;
+        if (arrow) { 
+          swipeData.arrows.push(arrow); 
+          updateVisorProgress(); 
+          visor.style.opacity = cfg.visor.o; 
+          const targetLen = isYellowSwipe ? 3 : 7;
+          if (swipeData.arrows.length === targetLen) resolveSwipe(); 
+        }
+      }
+      if (currentStroke) { strokes.push(currentStroke); currentStroke = null; render(); }
+      
+      if (drawPointerId !== null) {
+        drawPointerId = null;
+        try { board.releasePointerCapture(e.pointerId); } catch(e){}
+      }
+    };
+
+    window.onpointerup = endPointer;
+    window.onpointercancel = endPointer;
+  };
 
   const getPt = (e) => { const r = board.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
   const drawSeg = (p1, p2, c) => {
@@ -587,14 +601,13 @@
       const cardResult = STACK[cutNum-1];
       const cardStr = formatCard(cardResult); 
       
-      // Cálculo da posição no topo temporário
       let numStr = cutNum.toString().padStart(2, '0');
       if (tempTopCard) {
         const topPos = posMap[tempTopCard];
         const newPos = ((posMap[cardResult] - topPos + 1) + 52) % 52;
         const finalNewPos = (newPos === 0 ? 52 : newPos);
         numStr = finalNewPos.toString().padStart(2, '0');
-        tempTopCard = null; // Reset automático após o cálculo
+        tempTopCard = null; 
       }
       
       const peekResult = cfg.visor.peekStyle === "cardOnly" ? cardStr : (cfg.visor.inverted ? `${numStr} ${cardStr}` : `${cardStr} ${numStr}`);
@@ -603,15 +616,13 @@
       const XX = pos.toString().padStart(2, '0'); const YY = num.toString().padStart(2, '0'); 
       const footerResult = `Sethi Draw v.1.0.2 (${ZZ}.${XX}${YY})`;
       footer.textContent = footerResult;
-      lastFooterResult = footerResult; // Armazena o resultado completo para preservação no footer
+      lastFooterResult = footerResult; 
       stamp(num);
     }
   };
 
   const stamp = (n) => {
     const numKey = parseInt(n); const g = JSON.parse(localStorage.getItem(`v6_g_${numKey}`) || "null");
-    
-    // Prioridade: Ajuste individual do número (g.cfg) ou ajuste global (cfg.number)
     const nCfg = g?.cfg || cfg.number;
     const rx = nCfg.x * W / 100, ry = nCfg.y * H / 100;
     const rw = nCfg.s * W / 100, rh = nCfg.h * H / 100;
@@ -622,7 +633,7 @@
   };
 
   window.toggleSetup = () => {
-    if (eyePointerId !== null) return; // Evita abrir menu se estiver segurando o olho (opcional, mas seguro)
+    if (eyePointerId !== null) return; 
     if (mode === "setup") { mode = "draw"; setupPanel.classList.add("hidden"); visor.style.opacity = 0; applyCfg(); }
     else { closeOtherPanels(); mode = "setup"; setupPanel.classList.remove("hidden"); window.setTarget('panelSetup'); }
   };
@@ -667,7 +678,6 @@
   window.openCardsAdjust = () => { window.setTarget('panelCards'); window.toggleCards(true); };
 
   const closeOtherPanels = () => {
-    // Failsafe: Garante que o modo transparente seja removido ao trocar de painéis
     document.querySelectorAll(".panel").forEach(p => p.classList.remove("transparent-peek"));
     eyePointerId = null;
     if (floatingEyeBtn) floatingEyeBtn.style.display = "none";
@@ -724,92 +734,70 @@
       
       clearTimeout(peekTimer);
       peekTimer = setTimeout(() => { 
-        if (mode !== "setup" && mode !== "cards" && mode !== "train") { visor.style.opacity = 0; setTimeout(() => { if (mode === "draw") visorL1.textContent = cfg.visor.text; }, 300); }
+        if (mode !== "setup" && mode !== "cards" && mode !== "train") { visor.style.opacity = 0; }
         isYellowSwipe = false;
       }, cfg.peekDuration * 1000);
     }
   };
 
-  const resetCardInput = () => { 
-    cardInputData = { rank: "", suit: "", digits: "" }; 
-    cardInputDisplay.textContent = "--- --"; 
+  const resetCardInput = () => {
+    cardInputData = { rank: "", suit: "", digits: "" };
+    cardInputDisplay.textContent = "-- --";
     document.querySelectorAll("#panelCards .card-btn").forEach(b => b.classList.remove("active"));
   };
 
-  window.setTarget = (t) => { 
-    adjTarget = t;
-    document.getElementById("oControl").style.display = (t === "visor" || t === "footer" || t.startsWith("panel")) ? "block" : "none";
-    document.getElementById("editTextBtn").style.display = (t === "footer") ? "block" : "none";
-    updateAdjustUI();
-    applyCfg();
-  };
+  window.setTarget = (t) => { adjTarget = t; updateAdjustUI(); };
+  window.setInputType = (t) => { cfg.inputType = t; applyCfg(); };
+  window.setYellowTarget = (t) => { cfg.yellowTarget = t; applyCfg(); };
 
-  window.setInputType = (type) => { cfg.inputType = type; applyCfg(); };
-  window.setYellowTarget = (target) => { cfg.yellowTarget = target; applyCfg(); };
-
-  // Funções de Ajuste Aprimoradas
-  const renderStepper = (parent, label, axis, targetKey, step) => {
-    const val = cfg[targetKey][axis];
-    const displayVal = axis === 's' || axis === 'o' ? val.toFixed(2) : Math.round(val);
-    const html = `
-      <div class="stepper-control">
-        <span class="stepper-label">${label}</span>
-        <button class="stepper-btn" onclick="window.adjust('${axis}', -${step}, '${targetKey}')">-</button>
-        <div class="stepper-input" style="display:flex; align-items:center; justify-content:center;">${displayVal}</div>
-        <button class="stepper-btn" onclick="window.adjust('${axis}', ${step}, '${targetKey}')">+</button>
-      </div>
-    `;
-    parent.insertAdjacentHTML('beforeend', html);
-  };
-
-  const renderSlider = (parent, label, axis, targetKey, min, max, step) => {
-    const val = cfg[targetKey][axis];
-    const html = `
-      <div class="slider-control">
-        <div class="slider-label-group">
-          <span class="slider-label">${label}</span>
-          <span class="slider-value-display">${val.toFixed(2)}</span>
-        </div>
-        <input type="range" min="${min}" max="${max}" step="${step}" value="${val}" class="range-slider" 
-               oninput="window.adjust('${axis}', parseFloat(this.value), '${targetKey}', true)">
-      </div>
-    `;
-    parent.insertAdjacentHTML('beforeend', html);
-  };
-
-  window.updateAdjustUI = () => {
-    const setupContainer = document.getElementById("setupAdjusts");
+  const updateAdjustUI = () => {
+    const currentContainer = document.getElementById("setupAdjusts");
     const trainContainer = document.getElementById("trainAdjusts");
     const cardsContainer = document.getElementById("cardsAdjusts");
     const opacityContainer = document.getElementById("opacitySlider");
+    if (!currentContainer || !trainContainer || !cardsContainer) return;
 
-    if (setupContainer) setupContainer.innerHTML = "";
-    if (trainContainer) trainContainer.innerHTML = "";
-    if (cardsContainer) cardsContainer.innerHTML = "";
-    if (opacityContainer) opacityContainer.innerHTML = "";
+    currentContainer.innerHTML = ""; trainContainer.innerHTML = ""; cardsContainer.innerHTML = "";
+    
+    const renderStepper = (container, label, axis, targetKey, step) => {
+      const target = cfg[targetKey]; if (!target) return;
+      let val = target[axis];
+      if (targetKey === 'number' && mode === 'train') {
+        const g = JSON.parse(localStorage.getItem(`v6_g_${trainNum}`) || "null");
+        if (g?.cfg) val = g.cfg[axis];
+      }
+      const displayVal = (axis === 's' || axis === 'o') ? val.toFixed(2) : Math.round(val);
+      const html = `
+        <div class="stepper-control">
+          <span class="stepper-label">${label}</span>
+          <button class="stepper-btn" onclick="window.adjust('${axis}', ${-step}, '${targetKey}')">-</button>
+          <div class="stepper-input" style="display:flex; align-items:center; justify-content:center;">${displayVal}</div>
+          <button class="stepper-btn" onclick="window.adjust('${axis}', ${step}, '${targetKey}')">+</button>
+        </div>
+      `;
+      container.insertAdjacentHTML('beforeend', html);
+    };
 
-    const currentContainer = mode === 'setup' ? setupContainer : (mode === 'train' ? trainContainer : cardsContainer);
-    if (!currentContainer) return;
+    let targetKey = adjTarget;
+    let container = currentContainer;
+    if (mode === 'train') { targetKey = (adjustMode === 'number') ? 'number' : 'panelTrain'; container = trainContainer; }
+    if (mode === 'cards') { targetKey = 'panelCards'; container = cardsContainer; }
 
-    const targetKey = (mode === 'train' && adjustMode === 'number') ? 'number' : adjTarget;
-    let target = cfg[targetKey];
-    if (!target) return;
-
-    // Se estiver no modo treino ajustando o número, tenta pegar o ajuste individual
+    const target = cfg[targetKey];
     if (targetKey === 'number' && mode === 'train') {
       const g = JSON.parse(localStorage.getItem(`v6_g_${trainNum}`) || "null");
       if (g?.cfg) target = g.cfg;
     }
 
     if (targetKey === 'number') {
-      renderStepper(currentContainer, 'Posição X', 'x', targetKey, 1);
-      renderStepper(currentContainer, 'Posição Y', 'y', targetKey, 1);
-      renderStepper(currentContainer, 'Escala', 's', targetKey, 1);
+      renderStepper(container, 'Posição X', 'x', targetKey, 1);
+      renderStepper(container, 'Posição Y', 'y', targetKey, 1);
+      renderStepper(container, 'Escala', 's', targetKey, 1);
     } else {
-      renderStepper(currentContainer, 'Posição X', 'x', targetKey, 1);
-      renderStepper(currentContainer, 'Posição Y', 'y', targetKey, 1);
+      renderStepper(container, 'Posição X', 'x', targetKey, 1);
+      renderStepper(container, 'Posição Y', 'y', targetKey, 1);
       const sStep = targetKey.startsWith('panel') || targetKey === 'toolbar' ? 0.05 : 1;
-      renderStepper(currentContainer, targetKey.startsWith('panel') ? 'Escala' : 'Tamanho', 's', targetKey, sStep);
+      renderStepper(container, targetKey.startsWith('panel') ? 'Escala' : 'Tamanho', 's', targetKey, sStep);
     }
 
     if (opacityContainer && (adjTarget === 'visor' || adjTarget === 'footer' || adjTarget.startsWith('panel'))) {
@@ -831,11 +819,10 @@
     if (mode === 'train' && adjustMode === 'number') targetKey = 'number';
     let target = cfg[targetKey]; if (!target) return;
 
-    // Se estiver no modo treino ajustando o número, usa/cria o ajuste individual
     let isIndividual = false;
     if (targetKey === 'number' && mode === 'train') {
       const g = JSON.parse(localStorage.getItem(`v6_g_${trainNum}`) || "null");
-      target = g?.cfg || JSON.parse(JSON.stringify(cfg.number)); // Herda do global se não existir
+      target = g?.cfg || JSON.parse(JSON.stringify(cfg.number)); 
       isIndividual = true;
     }
 
@@ -849,7 +836,6 @@
         else if (targetKey === "number") { 
           const oldS = target.s;
           target.s += val;
-          // Ajuste proporcional da altura (h) baseado na nova escala (s)
           if (oldS > 0) target.h = target.h * (target.s / oldS);
         }
         else if (targetKey === "visor" || targetKey === "footer") { cfg.visor.s = Math.max(5, cfg.visor.s + val); cfg.footer.s = cfg.visor.s; }
@@ -882,11 +868,10 @@
     const val = parseFloat(inputVal);
     if (isNaN(val)) return;
 
-    // Se estiver no modo treino ajustando o número, usa/cria o ajuste individual
     let isIndividual = false;
     if (targetKey === 'number' && mode === 'train') {
       const g = JSON.parse(localStorage.getItem(`v6_g_${trainNum}`) || "null");
-      target = g?.cfg || JSON.parse(JSON.stringify(cfg.number)); // Herda do global se não existir
+      target = g?.cfg || JSON.parse(JSON.stringify(cfg.number)); 
       isIndividual = true;
     }
 
@@ -953,8 +938,6 @@
   const loadTrain = (n) => { 
     trainNum = Math.max(1, Math.min(52, n)); trainNumEl.textContent = trainNum; strokes = []; 
     const g = JSON.parse(localStorage.getItem(`v6_g_${trainNum}`) || "null");
-    
-    // Prioridade: Ajuste individual do número (g.cfg) ou ajuste global (cfg.number)
     const nCfg = g?.cfg || cfg.number;
     const rx = nCfg.x * W / 100, ry = nCfg.y * H / 100;
     const rw = nCfg.s * W / 100, rh = nCfg.h * H / 100;
@@ -971,7 +954,7 @@
     const s = strokes.map(st => ({ p: st.p.map(p => ({ x: (p.x - rx)/rw, y: (p.y - ry)/rh })) }));
     if (s.length > 0) { 
       const newData = { s };
-      if (g?.cfg) newData.cfg = g.cfg; // Preserva o ajuste individual ao salvar o desenho
+      if (g?.cfg) newData.cfg = g.cfg; 
       localStorage.setItem(`v6_g_${trainNum}`, JSON.stringify(newData)); 
       if (trainNum < 52) window.trainStep(1); else alert("Salvo!"); 
     }
@@ -1018,21 +1001,17 @@
     blueBtn.addEventListener("touchstart", startBluePeek, { passive: true }); window.addEventListener("touchend", stopBluePeek, { passive: true });
   };
 
-  // Cria o botão flutuante dinamicamente
   const createFloatingEyeBtn = () => {
     floatingEyeBtn = document.createElement("div");
     floatingEyeBtn.id = "floatingEyeBtn";
-    // Ícone de olho
     floatingEyeBtn.innerHTML = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>`;
     document.body.appendChild(floatingEyeBtn);
 
-    // Posição inicial padrão
     let floatX = W - 70;
     let floatY = 100;
     floatingEyeBtn.style.left = floatX + "px";
     floatingEyeBtn.style.top = floatY + "px";
 
-    // Lógica de Arrastar do Botão Flutuante
     let isDragging = false;
     let startX, startY, initialLeft, initialTop;
 
@@ -1077,10 +1056,8 @@
     const btn = document.getElementById(btnId); const panel = document.getElementById(panelId);
     if (!btn || !panel) return;
     
-    // Remove listeners antigos
     btn.onpointerdown = null; btn.onpointerup = null; btn.onpointercancel = null;
     
-    // Novo comportamento: Clique para minimizar
     btn.onclick = (e) => {
       e.stopPropagation();
       panel.classList.add("hidden");
